@@ -1,0 +1,2517 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта направлений — дашборд</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        /* ====================== СТИЛИ (ПОЛНАЯ КОПИЯ) ====================== */
+        :root {
+          --bg: #f8fafc;
+          --panel: #ffffff;
+          --text: #0f172a;
+          --muted: #64748b;
+          --border: #e2e8f0;
+          --accent: #2563eb;
+          --green: #16a34a;
+          --red: #dc2626;
+          --yellow: #ca8a04;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+          margin: 0;
+          background: var(--bg);
+          color: var(--text);
+          font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+
+        .app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+        .header {
+          display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+          border-bottom: 1px solid var(--border);
+          background: linear-gradient(180deg, #ffffff 0%, #f3f4f6 100%);
+        }
+        .header .title { font-weight: 600; letter-spacing: .2px; }
+        .header .spacer { flex: 1; }
+
+        .toolbar { display: grid; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
+        @media (min-width: 900px) {
+          .toolbar { grid-template-columns: 1fr auto auto; align-items: center; }
+        }
+        .filters { display: flex; flex-wrap: wrap; gap: 8px; }
+        .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+        .input, .select, .btn {
+          border: 1px solid var(--border);
+          background: #ffffff;
+          color: var(--text);
+          border-radius: 10px;
+          padding: 8px 10px;
+          font-size: 13px;
+        }
+        .input::placeholder { color: #94a3b8; }
+        .select { appearance: none; padding-right: 32px;
+          background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%), linear-gradient(to right, #e2e8f0, #e2e8f0);
+          background-position: calc(100% - 16px) calc(1em + 2px), calc(100% - 12px) calc(1em + 2px), calc(100% - 2.5em) 0.6em;
+          background-size: 5px 5px, 5px 5px, 1px 1.2em; background-repeat: no-repeat;
+        }
+
+        .btn { cursor: pointer; transition: background .12s ease, border-color .12s ease, transform .05s ease; }
+        .btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+        .btn:active { transform: translateY(1px); }
+        .btn.primary { border-color: #2563eb; background: var(--accent); color: #ffffff; }
+        .btn.ghost { background: transparent; }
+        .btn.toggle.active { outline: 2px solid rgba(37,99,235,0.35); }
+
+        .btn:focus-visible, .input:focus-visible, .select:focus-visible, textarea:focus-visible {
+          outline: 2px solid rgba(37,99,235,0.35);
+          outline-offset: 1px;
+        }
+
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .badge, .chip {
+          display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px;
+          border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--text); background: #f8fafc;
+        }
+        .badge.ok { color: var(--green); border-color: #a7f3d0; background: #ecfdf5; }
+        .badge.err { color: var(--red); border-color: #fecaca; background: #fef2f2; }
+        .badge.muted { color: var(--muted); }
+        .badge.warn { color: var(--yellow); border-color: #fde68a; background: #fffbeb; }
+
+        .grid { display: grid; gap: 12px; padding: 12px 16px; }
+        .grid.cards { grid-template-columns: 1fr; }
+        @media (min-width: 900px) { .grid.cards { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1200px) { .grid.cards { grid-template-columns: repeat(3, 1fr); } }
+
+        .card {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 12px; overflow: hidden;
+          transition: box-shadow .15s ease, border-color .15s ease;
+        }
+        .card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.08); border-color: #cbd5e1; }
+        .card .card-head { padding: 12px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; justify-content: space-between; }
+        .card .card-body { padding: 12px; display: grid; gap: 8px; }
+        .card .card-foot { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+
+        .table { width: 100%; border-collapse: collapse; background: var(--panel); }
+        .table th, .table td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; vertical-align: top; }
+        .table th { color: var(--muted); font-weight: 600; }
+        .table-row:hover { background: #f3f4f6; }
+
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 60; }
+        .modal {
+          position: fixed; right: 0; top: 0; height: 100vh; width: 100%; max-width: 460px; z-index: 61;
+          background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column;
+        }
+        .modal .modal-head { padding: 12px; border-bottom: 1px solid var(--border); display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+        .modal .modal-body { flex: 1; overflow: auto; padding: 12px; display: grid; gap: 12px; }
+        .modal .modal-foot { padding: 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 8px; }
+
+        .row { display: grid; gap: 10px; }
+        @media (min-width: 720px) { .row.cols-2 { grid-template-columns: 1fr 1fr; } }
+        .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: inline-block; }
+        .textarea { min-height: 90px; }
+        .small { font-size: 12px; color: var(--muted); }
+        .status { display: inline-flex; gap: 8px; align-items: center; }
+        .icon { opacity: .8; }
+        .list { margin: 0; padding-left: 18px; }
+        hr.sep { border: 0; border-top: 1px dashed var(--border); margin: 4px 0; opacity: .8; }
+
+        .sa-list { list-style: none; padding-left: 0; margin: 0; display: grid; gap: 10px; }
+        .sa-item { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; border-radius: 8px; padding: 8px; transition: background .12s ease, border-color .12s ease; border: 1px solid transparent; }
+        .sa-item.missing { border: 1px dashed var(--yellow); background: rgba(202,138,4,0.06); }
+        .sa-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .note-input { width: 100%; }
+        .softq { display: grid; gap: 8px; }
+        .softq-item { display: grid; gap: 4px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+        .softq-item.low { border-color: #fde68a; background: #fffbeb; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // ====================== ПОЛНЫЙ КОД ПРИЛОЖЕНИЯ ======================
+        
+        const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+        /* ====================== Константы порогов ====================== */
+        const FIT_MIN = 50;
+        const PILOT_MIN = 40;
+        const MIN_NOTE_CHARS = 20;
+
+        /* ====================== Константы и справочники ====================== */
+        const CUSTOMERS = ["Метро", "МГТ"];
+
+        const EFFECT_OPTIONS = [
+            "Клиентский опыт",
+            "Коммерция",
+            "Эффективность",
+            "Безопасность",
+            "Инфраструктура",
+            "Регуляторика",
+        ];
+
+        const EFFECT_DEFINITIONS = {
+            "Клиентский опыт": "Влияние на удобство и удовлетворённость пассажиров (качество сервиса, скорость, NPS).",
+            "Коммерция": "Прирост небилетной выручки / доходов.",
+            "Эффективность": "Снижение затрат/времени на операции, рост производительности.",
+            "Безопасность": "Снижение инцидентов, травматизма, нарушений.",
+            "Инфраструктура": "Пропускная способность, готовность и надёжность инфраструктуры.",
+            "Регуляторика": "Соответствие правилам, снижение нарушений и штрафов.",
+        };
+
+        const DIT_TAGS = [
+            "Электродвижение",
+            "Беспилотный транспорт",
+            "ITS",
+            "Оптимизация дорожной системы",
+            "Безопасность инфраструктуры",
+            "Микромобильность",
+            "Доступность (МГН)",
+            "Экология/Мониторинг",
+            "Цифровизация процессов",
+            "EdTech/HRTech",
+            "Другое",
+        ];
+
+        /* ====================== Исходные направления (6 шт.) ====================== */
+        const INITIAL_DIRECTIONS = [
+            {
+                code: "1.0",
+                name: "Пассажирские сервисы",
+                description: "Новые сервисы и улучшение UX для пассажиров городского транспорта.",
+                customersRecommended: ["Метро"],
+                openCases: [
+                    "Персонализированные уведомления",
+                    "Навигация и информирование",
+                    "Улучшение UX приложений и сервисов",
+                ],
+                recommendedEffects: ["Клиентский опыт"],
+                recommendedTags: ["Цифровизация процессов", "ITS"],
+                pilotHints: [
+                    "Выбрать пилотные станции/маршруты",
+                    "Согласовать доступ к данным",
+                    "Провести UX-тесты на фокус-группах",
+                ],
+                stakeholders: [],
+                requirements: [
+                    "Соответствие ПДн (152-ФЗ) и внутренним политикам",
+                    "Не ухудшает SLA уведомлений и информирования",
+                    "Работоспособность при низком качестве сети (офлайн-режимы)",
+                    "Подтверждённая польза через UX-тестирование/метрики",
+                ],
+            },
+            {
+                code: "2.0",
+                name: "Небилетные доходы",
+                description: "Дополнительная выручка с инфраструктуры метрополитена.",
+                customersRecommended: ["Метро"],
+                openCases: [
+                    "Коммерциализация инфраструктуры",
+                    "Партнёрские сервисы",
+                    "Digital signage/реклама",
+                ],
+                recommendedEffects: ["Коммерция"],
+                recommendedTags: ["Цифровизация процессов"],
+                pilotHints: [
+                    "Определить площадки",
+                    "Согласовать интеграции с биллингом",
+                    "Юридические рамки",
+                ],
+                stakeholders: [],
+                requirements: [
+                    "Юридически корректная схема монетизации",
+                    "Прозрачная аналитика и учёт выручки",
+                    "Совместимость с платёжной/договорной инфраструктурой",
+                    "Соблюдение бренд-безопасности и требований размещения",
+                ],
+            },
+            {
+                code: "3.0",
+                name: "Роботизация и БАС",
+                description: "Беспилотный транспорт и роботизация для задач транспортного комплекса.",
+                customersRecommended: ["Метро"],
+                openCases: [
+                    "БАС для задач ТК",
+                    "Автономная логистика на территории депо",
+                ],
+                recommendedEffects: ["Эффективность"],
+                recommendedTags: ["Беспилотный транспорт", "ITS"],
+                pilotHints: [
+                    "Испытательный полигон/маршрут",
+                    "Требования безопасности",
+                    "Телеметрия",
+                ],
+                stakeholders: [],
+                requirements: [
+                    "Документы/сертификация безопасности (ТР/ГОСТ в части испытаний)",
+                    "Наличие телеметрии и удалённого мониторинга",
+                    "Геозоны, сценарии fallback и ручного перехвата",
+                    "Оценка рисков и план реагирования",
+                ],
+            },
+            {
+                code: "4.0",
+                name: "Оплата проезда",
+                description: "Мотивация к оплате и новые способы оплаты.",
+                customersRecommended: ["Метро", "МГТ"],
+                openCases: [
+                    "Напоминания об оплате",
+                    "Альтернативные методы оплата",
+                    "Мотивационные механики",
+                ],
+                recommendedEffects: ["Регуляторика", "Коммерция"],
+                recommendedTags: ["Цифровизация процессов", "ITS"],
+                pilotHints: [
+                    "Совместимость с валидаторами/биллингом",
+                    "Юридическая экспертиза",
+                    "Пилот на 1–2 маршрутах",
+                ],
+                stakeholders: ["Организатор перевозок"],
+                requirements: [
+                    "Совместимость с существующими валидаторами и биллингом",
+                    "Защита платёжных данных (PCI DSS/аналогичные требования)",
+                    "Механизм верификации личности/правомерности оплаты при необходимости",
+                    "Согласование с операторами и регулятором",
+                ],
+            },
+            {
+                code: "6.0",
+                name: "Новые технологии для речного транспорта",
+                description: "Суда, верфи, причалы и развитие речной инфраструктуры.",
+                customersRecommended: ["Метро", "МГТ"],
+                openCases: [
+                    "Верфи и строительство судов",
+                    "Обновление/обустройство причалов",
+                    "Контроль движения и сервиса",
+                ],
+                recommendedEffects: ["Инфраструктура"],
+                recommendedTags: ["Экология/Мониторинг", "Безопасность инфраструктуры"],
+                pilotHints: [
+                    "Согласовать роли Метро/МГТ/ЦОДД",
+                    "Выбрать причал/маршрут",
+                    "Учитывать планы по верфи",
+                ],
+                stakeholders: ["ЦОДД", "Департамент транспорта"],
+                requirements: [
+                    "Согласование с речной администрацией и СУДС",
+                    "Проект причальной инфраструктуры и электроснабжения",
+                    "Экологические нормы/контроль выбросов/шум",
+                    "План безопасности и эвакуации для пассажиров",
+                ],
+            },
+            {
+                code: "8.0",
+                name: "Снижение травмоопасности",
+                description: "Снижение травмоопасности при посадке и в движении наземного транспорта.",
+                customersRecommended: ["МГТ"],
+                openCases: [
+                    "Предотвращение падений при посадке",
+                    "Информирование пассажиров",
+                    "Контроль скорости у остановок",
+                ],
+                recommendedEffects: ["Безопасность"],
+                recommendedTags: ["Безопасность инфраструктуры", "ITS"],
+                pilotHints: [
+                    "Доступ к данным по инцидентам",
+                    "Тестовая линия/маршрут",
+                    "Сертификация решений",
+                ],
+                stakeholders: [],
+                requirements: [
+                    "Соответствие профильным ГОСТ/ТУ по безопасности",
+                    "Мониторинг и отчётность по инцидентам",
+                    "Не ухудшает посадку/высадку и соблюдение графика",
+                    "Программа обучения и информирования персонала",
+                ],
+            },
+        ];
+
+        /* ====================== Примеры для требований ====================== */
+        const REQ_EXAMPLES = {
+            "Соответствие ПДн (152-ФЗ) и внутренним политикам": "Пример: обезличивание, доступ через служебный сервис; проверка: аудит логов, инциденты = 0",
+            "Не ухудшает SLA уведомлений и информирования": "Пример: A/B-тест, время доставки push ≤ 3с, % доставки не ниже базового",
+            "Работоспособность при низком качестве сети (офлайн-режимы)": "Пример: кэширование и офлайн-фолбэк; проверка на станциях без связи",
+            "Подтверждённая польза через UX-тестирование/метрики": "Пример: 5 UX-тестов; ожидание: рост CSAT +10 п.п.",
+            "Юридически корректная схема монетизации": "Пример: согласованный договорной поток; разделение выручки X/Y",
+            "Прозрачная аналитика и учёт выручки": "Пример: дашборд в BI; сверка чеков/сессий 1:1",
+            "Совместимость с платёжной/договорной инфраструктурой": "Пример: интеграция с биллингом N; тестовый стенд ОК",
+            "Соблюдение бренд-безопасности и требований размещения": "Пример: макеты согласованы; чек-лист размещения соблюдён",
+            "Документы/сертификация безопасности (ТР/ГОСТ в части испытаний)": "Пример: протоколы испытаний; чек по ТР/ГОСТ",
+            "Наличие телеметрии и удалённого мониторинга": "Пример: поток телеметрии в SCADA; тревоги на инциденты",
+            "Геозоны, сценарии fallback и ручного перехвата": "Пример: геозоны описаны; тренировки fallback/ручного перехвата",
+            "Оценка рисков и план реагирования": "Пример: HAZOP/FAQ; ролевая модель реагирования",
+            "Совместимость с существующими валидаторами и биллингом": "Пример: тесты с валидаторами X; стенд биллинга",
+            "Защита платёжных данных (PCI DSS/аналогичные требования)": "Пример: токенизация; хранение вне периметра",
+            "Механизм верификации личности/правомерности оплаты при необходимости": "Пример: схема верификации статуса в системе Y",
+            "Согласование с операторами и регулятором": "Пример: письма согласований; условия пилота",
+            "Согласование с речной администрацией и СУДС": "Пример: разрешение СУДС; окно пилота",
+            "Проект причальной инфраструктуры и электроснабжения": "Пример: схема мощности; место для ЗУ",
+            "Экологические нормы/контроль выбросов/шум": "Пример: уровень шума ≤ N дБ; нормы выбросов соблюдены",
+            "План безопасности и эвакуации для пассажиров": "Пример: эвакуационные схемы и тренировки",
+            "Соответствие профильным ГОСТ/ТУ по безопасности": "Пример: перечень ГОСТ; протоколы тестов",
+            "Мониторинг и отчётность по инцидентам": "Пример: метрика инцидентов/млн пассажиров",
+            "Не ухудшает посадку/высадку и соблюдение графика": "Пример: тайминги на остановках в норме",
+            "Программа обучения и информирования персонала": "Пример: план обучения на 2 смены",
+        };
+        const DEFAULT_REQ_EXAMPLE = "Пример: кратко опишите данные/системы и как проверите выполнение на пилоте (метрика/метод).";
+
+        /* ====================== LocalStorage и миграции ====================== */
+        const LS_DIRECTIONS_V3 = "mvb_directions_v3";
+        const LS_PROJECTS_V3 = "mvb_projects_v3";
+        const LS_DIRECTIONS_V2 = "mvb_directions_v2";
+        const LS_PROJECTS_V2 = "mvb_projects_v2";
+        const LS_TOUR_KEY = "mvb_tour_dismissed_v1";
+
+        function tryParse(raw) {
+            try {
+                return raw ? JSON.parse(raw) : null;
+            } catch {
+                return null;
+            }
+        }
+
+        function migrateV2toV3() {
+            try {
+                const v3Dir = tryParse(localStorage.getItem(LS_DIRECTIONS_V3));
+                const v3Proj = tryParse(localStorage.getItem(LS_PROJECTS_V3));
+                const needDir = !Array.isArray(v3Dir) || v3Dir.length === 0;
+                const needProj = !Array.isArray(v3Proj);
+                if (needDir) {
+                    const v2Dir = tryParse(localStorage.getItem(LS_DIRECTIONS_V2));
+                    if (Array.isArray(v2Dir) && v2Dir.length > 0) {
+                        localStorage.setItem(LS_DIRECTIONS_V3, JSON.stringify(v2Dir));
+                    }
+                }
+                if (needProj) {
+                    const v2Proj = tryParse(localStorage.getItem(LS_PROJECTS_V2));
+                    if (Array.isArray(v2Proj)) {
+                        localStorage.setItem(LS_PROJECTS_V3, JSON.stringify(v2Proj));
+                    }
+                }
+            } catch {}
+        }
+
+        function saveDirections(arr) {
+            try {
+                localStorage.setItem(LS_DIRECTIONS_V3, JSON.stringify(arr));
+            } catch {}
+        }
+
+        function loadDirections() {
+            migrateV2toV3();
+            try {
+                const raw = localStorage.getItem(LS_DIRECTIONS_V3);
+                if (raw) {
+                    const arr = JSON.parse(raw);
+                    if (Array.isArray(arr) && arr.length > 0) return arr;
+                }
+            } catch {}
+            localStorage.setItem(LS_DIRECTIONS_V3, JSON.stringify(INITIAL_DIRECTIONS));
+            return INITIAL_DIRECTIONS;
+        }
+
+        function saveProjects(arr) {
+            try {
+                localStorage.setItem(LS_PROJECTS_V3, JSON.stringify(arr));
+            } catch {}
+        }
+
+        /* ====================== Утилиты ====================== */
+        function uuid() {
+            return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+                const r = (Math.random() * 16) | 0;
+                const v = c === "x" ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+            });
+        }
+
+        function normalizeText(s = "") {
+            return (s || "").toLowerCase();
+        }
+
+        function openCasesMatchRatio(idea = "", description = "", openCases = []) {
+            const text = normalizeText(`${idea} ${description}`);
+            if (!openCases || openCases.length === 0) return 0;
+            let matched = 0;
+            for (const oc of openCases) {
+                const tokens = oc
+                    .toLowerCase()
+                    .split(/[^\p{L}\p{N}]+/u)
+                    .filter(Boolean);
+                const hit = tokens.some((t) => text.includes(t));
+                if (hit) matched += 1;
+            }
+            return matched / openCases.length;
+        }
+
+        function intersectCount(a = [], b = []) {
+            const set = new Set(a);
+            return b.reduce((acc, x) => acc + (set.has(x) ? 1 : 0), 0);
+        }
+
+        function computeFitScore(project, directions) {
+            const dir = directions.find((d) => d.name === project.directionName);
+            if (!dir) return 0;
+            const dirAlign = openCasesMatchRatio(
+                project.title || "",
+                project.shortDescription || "",
+                dir.openCases || []
+            );
+            const effRecommended = dir.recommendedEffects || [];
+            const effMatch =
+                effRecommended.length > 0
+                    ? intersectCount(project.effectTags || [], effRecommended) /
+                      effRecommended.length
+                    : 0;
+            const custMatch = (dir.customersRecommended || []).includes(
+                project.customer || ""
+            )
+                ? 1
+                : 0;
+            const fit = 100 * (0.5 * dirAlign + 0.3 * effMatch + 0.2 * custMatch);
+            return Math.round(fit);
+        }
+
+        function computePilotReadiness(project) {
+            const p = project.pilot || {};
+            const fields = [
+                p.site,
+                (p.dataSources || []).length > 0,
+                (p.integrations || []).length > 0,
+                p.legalApprovals,
+                p.resources,
+                p.stepsPlan,
+                p.successCriteria,
+            ];
+            const values = fields.map((f) =>
+                Array.isArray(f) ? f.length > 0 : typeof f === "string" ? f.trim() !== "" : !!f
+            );
+            const completed = values.filter(Boolean).length;
+            const total = fields.length;
+            return Math.round((completed / total) * 100);
+        }
+
+        function isTrivialNote(val) {
+            const v = (val || "").trim().toLowerCase();
+            if (v.length === 0) return true;
+            const trivial = new Set(["-", "—", "ok", "ок", "n/a", "н/д", "none", "пусто"]);
+            return trivial.has(v);
+        }
+
+        function computeReqNotesScore(project, dir) {
+            const reqTotal = dir
+                ? (dir.requirements || []).length
+                : Math.max(project.selfAssessment?.length || 0, project.selfAssessmentNotes?.length || 0);
+            if (!reqTotal || reqTotal <= 0) return 0;
+            let ok = 0;
+            for (let i = 0; i < reqTotal; i++) {
+                const note = project.selfAssessmentNotes?.[i] || "";
+                if (note && note.trim().length >= MIN_NOTE_CHARS && !isTrivialNote(note)) ok += 1;
+            }
+            return Math.round((ok / reqTotal) * 100);
+        }
+
+        function computePilotCoreScore(project) {
+            const p = project.pilot || {};
+            const tri = [
+                (p.site || "").trim() !== "",
+                (p.dataSources || []).length > 0,
+                (p.integrations || []).length > 0,
+            ];
+            const cnt = tri.filter(Boolean).length;
+            if (cnt === 0) return 0;
+            if (cnt === 1) return 40;
+            if (cnt === 2) return 70;
+            return 100; // cnt === 3
+        }
+
+        function computeIdeaAdequacy(project, dir) {
+            const reqNotesScore = computeReqNotesScore(project, dir);
+            const pilotCoreScore = computePilotCoreScore(project);
+            const raw = 0.6 * reqNotesScore + 0.4 * pilotCoreScore;
+            return Math.round(raw);
+        }
+
+        function timeStamp() {
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, "0");
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(
+                d.getHours()
+            )}-${pad(d.getMinutes())}`;
+        }
+
+        function downloadBlob(content, mime, name) {
+            const blob = content instanceof Blob ? content : new Blob([content], { type: mime + ";charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = name;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function useOnClickOutside(ref, handler) {
+            useEffect(() => {
+                const fn = (e) => {
+                    if (!ref.current) return;
+                    if (!ref.current.contains(e.target)) handler();
+                };
+                document.addEventListener("mousedown", fn);
+                return () => document.removeEventListener("mousedown", fn);
+            }, [ref, handler]);
+        }
+
+        function useDebounced(value, delay = 200) {
+            const [v, setV] = useState(value);
+            useEffect(() => {
+                const h = setTimeout(() => setV(value), delay);
+                return () => clearTimeout(h);
+            }, [value, delay]);
+            return v;
+        }
+
+        /* ====================== Нормализация проектов ====================== */
+        function normalizeProject(p, directions) {
+            const id = p.id || uuid();
+            const pilot = {
+                site: p?.pilot?.site || "",
+                dataSources: Array.isArray(p?.pilot?.dataSources) ? p.pilot.dataSources : [],
+                integrations: Array.isArray(p?.pilot?.integrations) ? p.pilot.integrations : [],
+                legalApprovals: p?.pilot?.legalApprovals || "",
+                resources: p?.pilot?.resources || "",
+                stepsPlan: p?.pilot?.stepsPlan || "",
+                successCriteria: p?.pilot?.successCriteria || "",
+            };
+            const projBase = {
+                id,
+                title: p.title || "",
+                teamName: p.teamName || "",
+                teamMembers: Array.isArray(p.teamMembers) ? p.teamMembers : [],
+                customer: p.customer || "",
+                directionName: p.directionName || "",
+                directionCode: p.directionCode || "",
+                targetAudience: Array.isArray(p.targetAudience) ? p.targetAudience : [],
+                effectTags: Array.isArray(p.effectTags) ? p.effectTags : [],
+                DITTags: Array.isArray(p.DITTags) ? p.DITTags : [],
+                shortDescription: p.shortDescription || "",
+                pilot,
+                selfAssessment: Array.isArray(p.selfAssessment) ? p.selfAssessment : [],
+                selfAssessmentNotes: Array.isArray(p.selfAssessmentNotes) ? p.selfAssessmentNotes : [],
+                selfAssessmentPassed: !!p.selfAssessmentPassed,
+                fitScore: typeof p.fitScore === "number" ? p.fitScore : 0,
+                pilotReadiness: typeof p.pilotReadiness === "number" ? p.pilotReadiness : 0,
+                ideaAdequacy: typeof p.ideaAdequacy === "number" ? p.ideaAdequacy : 0,
+                status: p.status === "черновик" ? "черновик" : "готов",
+            };
+            // Поддерживаем актуальность расчетов
+            projBase.fitScore = computeFitScore(projBase, directions);
+            projBase.pilotReadiness = computePilotReadiness(projBase);
+            const dirObj = directions.find((d) => d.name === projBase.directionName);
+            projBase.ideaAdequacy = computeIdeaAdequacy(projBase, dirObj);
+
+            // Подгоняем длину selfAssessmentNotes под требования
+            const reqLen = dirObj?.requirements?.length || 0;
+            if (projBase.selfAssessmentNotes.length < reqLen) {
+                const arr = projBase.selfAssessmentNotes.slice();
+                while (arr.length < reqLen) arr.push("");
+                projBase.selfAssessmentNotes = arr;
+            }
+            if (projBase.selfAssessment.length < reqLen) {
+                const sa = projBase.selfAssessment.slice();
+                while (sa.length < reqLen) sa.push(false);
+                projBase.selfAssessment = sa;
+            }
+            return projBase;
+        }
+
+        function loadProjects() {
+            migrateV2toV3();
+            try {
+                const raw = localStorage.getItem(LS_PROJECTS_V3);
+                if (raw) {
+                    const arr = JSON.parse(raw);
+                    if (Array.isArray(arr)) {
+                        const dirs = loadDirections(); // для нормализации
+                        return arr.map((p) => normalizeProject(p, dirs));
+                    }
+                }
+            } catch {}
+            localStorage.setItem(LS_PROJECTS_V3, JSON.stringify([]));
+            return [];
+        }
+
+        /* ====================== Примитивы UI ====================== */
+        function ToggleGroup({ value, onChange, items, ariaLabel }) {
+            return (
+                React.createElement("div", { 
+                    role: "tablist", 
+                    "aria-label": ariaLabel, 
+                    className: "chips" 
+                }, items.map((it) =>
+                    React.createElement("button", {
+                        key: it.value,
+                        role: "tab",
+                        "aria-selected": value === it.value,
+                        className: "btn toggle " + (value === it.value ? "active" : ""),
+                        onClick: () => onChange(it.value),
+                        title: it.label
+                    }, it.label)
+                ))
+            );
+        }
+
+        function Badge({ children, kind = "outline", title }) {
+            const cls =
+                kind === "ok"
+                    ? "badge ok"
+                    : kind === "err"
+                    ? "badge err"
+                    : kind === "muted"
+                    ? "badge muted"
+                    : kind === "warn"
+                    ? "badge warn"
+                    : "badge";
+            return React.createElement("span", { className: cls, title }, children);
+        }
+
+        function Chip({ children, onRemove, ariaLabel, onClick }) {
+            return React.createElement("span", {
+                className: "chip",
+                "aria-label": ariaLabel,
+                style: { cursor: onClick ? "pointer" : "default" },
+                onClick
+            }, children, onRemove && React.createElement("button", {
+                className: "btn ghost",
+                style: { padding: "0px 6px" },
+                "aria-label": "Удалить",
+                onClick: (e) => {
+                    e.stopPropagation();
+                    onRemove();
+                }
+            }, "×"));
+        }
+
+        function TagsInput({ label, values, setValues, placeholder, ariaLabel }) {
+            const [input, setInput] = useState("");
+            const addValue = (v) => {
+                const t = v.trim();
+                if (t && !values.includes(t)) setValues([...values, t]);
+            };
+            const onKeyDown = (e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    addValue(input);
+                    setInput("");
+                }
+                if (e.key === "Backspace" && input === "" && values.length > 0) {
+                    setValues(values.slice(0, -1));
+                }
+            };
+            return React.createElement("div", null,
+                React.createElement("div", { className: "label" }, label),
+                React.createElement("div", {
+                    className: "chips",
+                    style: {
+                        border: "1px solid var(--border)",
+                        borderRadius: 10,
+                        padding: 6,
+                        background: "#ffffff",
+                    }
+                }, values.map((v) =>
+                    React.createElement(Chip, {
+                        key: v,
+                        onRemove: () => setValues(values.filter((x) => x !== v)),
+                        ariaLabel: v
+                    }, v)
+                ), React.createElement("input", {
+                    className: "input",
+                    style: { flex: 1, minWidth: 120, background: "transparent", border: "none", padding: "6px 8px" },
+                    value: input,
+                    onChange: (e) => setInput(e.target.value),
+                    onKeyDown,
+                    placeholder,
+                    "aria-label": ariaLabel
+                }))
+            );
+        }
+
+        function MultiSelectDropdown({ label, options, values, setValues, defs }) {
+            const [open, setOpen] = useState(false);
+            const ref = useRef(null);
+            useOnClickOutside(ref, () => setOpen(false));
+            const toggle = (v) => {
+                setValues(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
+            };
+            return React.createElement("div", { className: "dropdown", ref, style: { position: "relative" } },
+                React.createElement("div", { className: "label" }, label),
+                React.createElement("button", {
+                    className: "btn",
+                    onClick: () => setOpen((v) => !v),
+                    "aria-haspopup": "menu",
+                    "aria-expanded": open
+                }, values.length > 0 ? values.join(", ") : "Выберите..."),
+                open && React.createElement("div", {
+                    role: "menu",
+                    "aria-label": label,
+                    style: {
+                        position: "absolute",
+                        marginTop: 4,
+                        background: "#fff",
+                        border: "1px solid var(--border)",
+                        borderRadius: 10,
+                        padding: 8,
+                        zIndex: 50,
+                        minWidth: 220,
+                    }
+                }, options.map((opt) =>
+                    React.createElement("div", {
+                        key: opt,
+                        className: "dropdown-item",
+                        onClick: () => toggle(opt),
+                        role: "menuitemcheckbox",
+                        "aria-checked": values.includes(opt),
+                        style: {
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                            padding: 6,
+                            borderRadius: 8,
+                            cursor: "pointer",
+                        }
+                    }, React.createElement("input", { 
+                        type: "checkbox", 
+                        readOnly: true, 
+                        checked: values.includes(opt) 
+                    }), React.createElement("span", null, opt), defs?.[opt] ? 
+                    React.createElement("span", { className: "small" }, "— ", defs[opt]) : null)
+                ))
+            );
+        }
+
+        function CheckboxList({ label, items, values, setValues }) {
+            const toggle = (v) =>
+                setValues(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
+            return React.createElement("div", null,
+                React.createElement("div", { className: "label" }, label),
+                React.createElement("div", { className: "chips" }, items.map((c) =>
+                    React.createElement("label", { 
+                        key: c, 
+                        className: "chip", 
+                        style: { cursor: "pointer" } 
+                    }, React.createElement("input", {
+                        type: "checkbox",
+                        checked: values.includes(c),
+                        onChange: () => toggle(c),
+                        "aria-label": c
+                    }), React.createElement("span", null, c)))
+                )
+            );
+        }
+
+        function SortHeader({ label, sortKey, currentKey, sortDir, onSort }) {
+            const active = currentKey === sortKey;
+            return React.createElement("button", {
+                className: "btn ghost",
+                onClick: () => onSort(sortKey),
+                "aria-label": `Сортировать: ${label}`,
+                title: label
+            }, React.createElement("span", null, label), React.createElement("span", { 
+                className: "icon", 
+                style: { marginLeft: 6 } 
+            }, active ? (sortDir === "asc" ? "▲" : "▼") : "↕"));
+        }
+
+        function SideModal({ open, title, onClose, headExtra, children, footLeft, footRight, ariaLabel }) {
+            useEffect(() => {
+                const onKey = (e) => {
+                    if (e.key === "Escape") onClose();
+                };
+                document.addEventListener("keydown", onKey);
+                return () => document.removeEventListener("keydown", onKey);
+            }, [onClose]);
+            if (!open) return null;
+            return React.createElement(React.Fragment, null,
+                React.createElement("div", { 
+                    className: "modal-backdrop", 
+                    onClick: onClose, 
+                    "aria-hidden": "true" 
+                }),
+                React.createElement("aside", {
+                    className: "modal",
+                    role: "dialog",
+                    "aria-modal": "true",
+                    "aria-label": ariaLabel || title
+                }, React.createElement("div", { className: "modal-head" },
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { fontWeight: 600 } }, title),
+                        React.createElement("div", { className: "small" }, "Нажмите Esc для закрытия")
+                    ),
+                    React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } },
+                        headExtra,
+                        React.createElement("button", {
+                            className: "btn ghost",
+                            onClick: onClose,
+                            "aria-label": "Закрыть"
+                        }, "✕")
+                    )
+                ), React.createElement("div", { className: "modal-body" }, children),
+                React.createElement("div", { className: "modal-foot" },
+                    React.createElement("div", null, footLeft),
+                    React.createElement("div", { style: { display: "flex", gap: 8 } }, footRight)
+                ))
+            );
+        }
+
+        /* ====================== Подсказки (пресеты) ====================== */
+        function computePresetDataSources(effects, directionName) {
+            const set = new Set();
+            const add = (x) => x.forEach((v) => set.add(v));
+            if (effects.includes("Регуляторика") || (directionName || "").toLowerCase().includes("оплата")) add(["валидаторы", "транзакции/биллинг"]);
+            if (effects.includes("Клиентский опыт")) add(["лог событий приложения", "CRM жалоб"]);
+            if (effects.includes("Эффективность")) add(["SCADA/датчики", "телеметрия депо"]);
+            if (effects.includes("Безопасность")) add(["журналы инцидентов", "видеонаблюдение"]);
+            if (effects.includes("Инфраструктура")) add(["паспорта объектов", "нагрузки/трафик"]);
+            return Array.from(set);
+        }
+
+        function computePresetIntegrations(effects, directionName) {
+            const set = new Set();
+            const add = (x) => x.forEach((v) => set.add(v));
+            if (effects.includes("Регуляторика") || (directionName || "").toLowerCase().includes("оплата")) add(["биллинг", "платёжный шлюз"]);
+            if (effects.includes("Клиентский опыт")) add(["push-шлюз", "навигация/карты"]);
+            if (effects.includes("Эффективность")) add(["ERP/учёт", "CMMS"]);
+            if (effects.includes("Безопасность")) add(["система безопасности", "алертинг"]);
+            if (effects.includes("Инфраструктура")) add(["АСУ ТП", "ГИС"]);
+            return Array.from(set);
+        }
+
+        function suggestEffects(title, descr) {
+            const text = `${title} ${descr}`.toLowerCase();
+            const sugg = new Set();
+            if (/(оплата|штраф|билет|валидатор|биллинг)/i.test(text)) { sugg.add("Регуляторика"); sugg.add("Коммерция"); }
+            if (/(уведомлен|навигац|приложен|nps|ux)/i.test(text)) { sugg.add("Клиентский опыт"); }
+            if (/(инцидент|безопасн|травм)/i.test(text)) { sugg.add("Безопасность"); }
+            if (/(scada|датчик|телеметр|ремонт|учёт|erp|cmms)/i.test(text)) { sugg.add("Эффективность"); sugg.add("Инфраструктура"); }
+            return Array.from(sugg);
+        }
+
+        function suggestDITTags(title, descr) {
+            const text = `${title} ${descr}`.toLowerCase();
+            const sugg = new Set();
+            if (/(оплата|штраф|билет|валидатор|биллинг)/i.test(text)) { sugg.add("Цифровизация процессов"); }
+            if (/(уведомлен|навигац|приложен|nps|ux)/i.test(text)) { sugg.add("Цифровизация процессов"); }
+            if (/(инцидент|безопасн|травм)/i.test(text)) { sugg.add("Безопасность инфраструктуры"); }
+            if (/(scada|датчик|телеметр|ремонт|учёт|erp|cmms)/i.test(text)) { sugg.add("Безопасность инфраструктуры"); sugg.add("Цифровизация процессов"); }
+            return Array.from(sugg);
+        }
+
+        /* ====================== Project: форма ====================== */
+        function ProjectDrawer({ open, onClose, directions, initialProject, onSaveFinal, onSaveDraft }) {
+            const isEdit = !!(initialProject && initialProject.id);
+
+            // Fields
+            const [title, setTitle] = useState("");
+            const [teamName, setTeamName] = useState("");
+            const [teamMembers, setTeamMembers] = useState([]);
+            const [customer, setCustomer] = useState("");
+            const [directionName, setDirectionName] = useState("");
+            const [directionCode, setDirectionCode] = useState("");
+            const [targetAudience, setTargetAudience] = useState([]);
+            const [effectTags, setEffectTags] = useState([]);
+            const [DITTags, setDITTags] = useState([]);
+            const [shortDescription, setShortDescription] = useState("");
+
+            const [pilotSite, setPilotSite] = useState("");
+            const [pilotDataSources, setPilotDataSources] = useState([]);
+            const [pilotIntegrations, setPilotIntegrations] = useState([]);
+            const [pilotLegal, setPilotLegal] = useState("");
+            const [pilotResources, setPilotResources] = useState("");
+            const [pilotSteps, setPilotSteps] = useState("");
+            const [pilotSuccess, setPilotSuccess] = useState("");
+
+            const [selfChecks, setSelfChecks] = useState([]);
+            const [selfNotes, setSelfNotes] = useState([]);
+            const [errors, setErrors] = useState({});
+
+            // Мягкие вопросы (UI-ONLY, не меняют Project)
+            const SOFT_QUESTIONS = [
+                "Ясность проблемы и ЦА (насколько чётко сформулировано?)",
+                "Измеримость эффекта (есть ли метрики успеха?)",
+                "Доступ к данным и интеграциям (насколько реалистично?)",
+                "Риски пилота и меры реагирования (оценены ли?)",
+                "Вовлечённость стейкхолдеров (договорённости/интерес?)",
+            ];
+            const [softScores, setSoftScores] = useState([3, 3, 3, 3, 3]);
+
+            const dirObj = useMemo(() => directions.find((d) => d.name === directionName), [directions, directionName]);
+            const reqs = (dirObj?.requirements ?? []);
+
+            // Выравнивание массивов чеков/заметок под длину требований + заполнение при открытии/редактировании
+            useEffect(() => {
+                if (!open) return;
+                if (isEdit && initialProject) {
+                    setTitle(initialProject.title || "");
+                    setTeamName(initialProject.teamName || "");
+                    setTeamMembers(initialProject.teamMembers || []);
+                    setCustomer(initialProject.customer || "");
+                    setDirectionName(initialProject.directionName || "");
+                    setDirectionCode(initialProject.directionCode || "");
+                    setTargetAudience(initialProject.targetAudience || []);
+                    setEffectTags(initialProject.effectTags || []);
+                    setDITTags(initialProject.DITTags || []);
+                    setShortDescription(initialProject.shortDescription || "");
+                    const p = initialProject.pilot || {};
+                    setPilotSite(p.site || "");
+                    setPilotDataSources(p.dataSources || []);
+                    setPilotIntegrations(p.integrations || []);
+                    setPilotLegal(p.legalApprovals || "");
+                    setPilotResources(p.resources || "");
+                    setPilotSteps(p.stepsPlan || "");
+                    setPilotSuccess(p.successCriteria || "");
+                    const d = directions.find((dd) => dd.name === initialProject.directionName);
+                    const len = (d?.requirements ?? []).length;
+                    const sa = (initialProject.selfAssessment || []).slice(0, len);
+                    while (sa.length < len) sa.push(false);
+                    setSelfChecks(sa);
+                    const notes = Array.isArray(initialProject.selfAssessmentNotes)
+                        ? initialProject.selfAssessmentNotes.slice(0, len)
+                        : [];
+                    while (notes.length < len) notes.push("");
+                    setSelfNotes(notes);
+                } else if (open) {
+                    // reset
+                    setTitle("");
+                    setTeamName("");
+                    setTeamMembers([]);
+                    setCustomer("");
+                    setDirectionName("");
+                    setDirectionCode("");
+                    setTargetAudience([]);
+                    setEffectTags([]);
+                    setDITTags([]);
+                    setShortDescription("");
+                    setPilotSite("");
+                    setPilotDataSources([]);
+                    setPilotIntegrations([]);
+                    setPilotLegal("");
+                    setPilotResources("");
+                    setPilotSteps("");
+                    setPilotSuccess("");
+                    setSelfChecks([]);
+                    setSelfNotes([]);
+                    setSoftScores([3, 3, 3, 3, 3]);
+                }
+                setErrors({});
+            }, [open, isEdit, initialProject, directions]);
+
+            const onDirectionChange = (name) => {
+                setDirectionName(name);
+                const d = directions.find((x) => x.name === name);
+                setDirectionCode(d?.code || "");
+                if (effectTags.length === 0 && (d?.recommendedEffects || []).length > 0) {
+                    setEffectTags(d.recommendedEffects);
+                }
+                const len = (d?.requirements ? d.requirements : []).length;
+                setSelfChecks(Array.from({ length: len }, () => false));
+                setSelfNotes(Array.from({ length: len }, () => ""));
+            };
+
+            const computed = useMemo(() => {
+                const proj = {
+                    title,
+                    customer,
+                    directionName,
+                    directionCode,
+                    targetAudience,
+                    effectTags,
+                    DITTags,
+                    shortDescription,
+                    pilot: {
+                        site: pilotSite,
+                        dataSources: pilotDataSources,
+                        integrations: pilotIntegrations,
+                        legalApprovals: pilotLegal,
+                        resources: pilotResources,
+                        stepsPlan: pilotSteps,
+                        successCriteria: pilotSuccess,
+                    },
+                    selfAssessmentNotes: selfNotes,
+                };
+                const fit = computeFitScore(proj, directions);
+                const pilot = computePilotReadiness(proj);
+                const idea = computeIdeaAdequacy(proj, dirObj || undefined);
+                return { fit, pilot, idea };
+            }, [
+                title,
+                customer,
+                directionName,
+                directionCode,
+                targetAudience,
+                effectTags,
+                DITTags,
+                shortDescription,
+                pilotSite,
+                pilotDataSources,
+                pilotIntegrations,
+                pilotLegal,
+                pilotResources,
+                pilotSteps,
+                pilotSuccess,
+                selfNotes,
+                directions,
+                dirObj,
+            ]);
+
+            const notesOkFlags = reqs.map((_, i) => {
+                const n = (selfNotes[i] || "").trim();
+                return n.length >= MIN_NOTE_CHARS && !isTrivialNote(n);
+            });
+            const allChecked = reqs.length > 0 ? reqs.every((_, i) => !!selfChecks[i]) : true;
+            const allNotesOk = reqs.length > 0 ? notesOkFlags.every(Boolean) : true;
+            const allNotesEmpty = reqs.length > 0 ? notesOkFlags.filter(Boolean).length === 0 : true;
+
+            const pilotTriadCount = [
+                (pilotSite || "").trim() !== "",
+                (pilotDataSources || []).length > 0,
+                (pilotIntegrations || []).length > 0,
+            ].filter(Boolean).length;
+
+            // Рекомендации «Следующий шаг»
+            const nextSteps = [];
+            if (!pilotSite.trim()) nextSteps.push("Назовите площадку пилота (маршрут/депо/станция)");
+            if ((pilotDataSources || []).length === 0) nextSteps.push("Добавьте 1 источник данных (например, валидаторы/CRM жалоб)");
+            if ((pilotIntegrations || []).length === 0) nextSteps.push("Добавьте 1 систему/API (например, биллинг/телеметрия)");
+            if (!allChecked) nextSteps.push("Отметьте все требования направления");
+            if (!allNotesOk) nextSteps.push("Напишите короткое обоснование (≥ 20 символов)");
+            if (computed.fit < 20) nextSteps.push("Уточните эффекты/заказчика (повысит Fit)");
+            const nextStepsUnique = Array.from(new Set(nextSteps)).slice(0, 3);
+
+            const validateBase = () => {
+                const e = {};
+                if (!title.trim()) e.title = "Введите название проекта.";
+                if (!teamName.trim()) e.teamName = "Введите название команды.";
+                if (!customer) e.customer = "Выберите заказчика.";
+                if (!directionName) e.directionName = "Выберите направление.";
+                setErrors(e);
+                return Object.keys(e).length === 0;
+            };
+
+            const submit = (status) => {
+                if (status === "готов") {
+                    if (!validateBase() || !allChecked || !allNotesOk || computed.fit < FIT_MIN || computed.pilot < PILOT_MIN) {
+                        return;
+                    }
+                }
+                const id = isEdit && initialProject ? initialProject.id : uuid();
+                const base = {
+                    id,
+                    title,
+                    teamName,
+                    teamMembers,
+                    customer,
+                    directionName,
+                    directionCode,
+                    targetAudience,
+                    effectTags,
+                    DITTags,
+                    shortDescription,
+                    pilot: {
+                        site: pilotSite,
+                        dataSources: pilotDataSources,
+                        integrations: pilotIntegrations,
+                        legalApprovals: pilotLegal,
+                        resources: pilotResources,
+                        stepsPlan: pilotSteps,
+                        successCriteria: pilotSuccess,
+                    },
+                    selfAssessment: selfChecks.slice(),
+                    selfAssessmentNotes: selfNotes.slice(),
+                    selfAssessmentPassed: allChecked,
+                    fitScore: 0,
+                    pilotReadiness: 0,
+                    ideaAdequacy: 0,
+                    status,
+                };
+                base.fitScore = computeFitScore(base, directions);
+                base.pilotReadiness = computePilotReadiness(base);
+                const dir = directions.find((d) => d.name === base.directionName);
+                base.ideaAdequacy = computeIdeaAdequacy(base, dir);
+                if (status === "готов") onSaveFinal(base);
+                else onSaveDraft(base);
+                onClose();
+            };
+
+            const unmet = [];
+            if (!allChecked) unmet.push("Отметьте все требования направления");
+            if (!allNotesOk) unmet.push("Заполните обоснования под каждый пункт (≥ 20 символов)");
+            if (computed.fit < FIT_MIN) unmet.push(`Требуется Fit ≥ ${FIT_MIN}%`);
+            if (computed.pilot < PILOT_MIN) unmet.push(`Требуется Pilot ≥ ${PILOT_MIN}%`);
+
+            const baseFieldsOk =
+                (title || "").trim().length > 0 &&
+                (teamName || "").trim().length > 0 &&
+                !!customer &&
+                !!directionName;
+            const canSave = baseFieldsOk && allChecked && allNotesOk && computed.fit >= FIT_MIN && computed.pilot >= PILOT_MIN;
+
+            // Подсказки по эффектам/тегам
+            const effSugg = suggestEffects(title, shortDescription).filter((t) => !effectTags.includes(t));
+            const ditSugg = suggestDITTags(title, shortDescription).filter((t) => !DITTags.includes(t));
+
+            // Пресеты для пилота
+            const dsPresets = computePresetDataSources(effectTags, directionName).filter((x) => !pilotDataSources.includes(x));
+            const intPresets = computePresetIntegrations(effectTags, directionName).filter((x) => !pilotIntegrations.includes(x));
+
+            return React.createElement(SideModal, {
+                open,
+                onClose,
+                title: isEdit ? "Редактировать проект" : "Добавить проект",
+                "aria-label": "Форма проекта",
+                headExtra: React.createElement("div", { className: "chips" },
+                    React.createElement(Badge, { 
+                        title: "Fit% = 50% текстовые совпадения + 30% эффекты + 20% заказчик" 
+                    }, "Fit ", computed.fit, "%"),
+                    React.createElement(Badge, { 
+                        title: "Pilot% = доля заполненных полей пилота" 
+                    }, "Pilot ", computed.pilot, "%"),
+                    React.createElement(Badge, { 
+                        title: "Idea% = 60% качество обоснований + 40% core пилота" 
+                    }, "Idea ", computed.idea, "%")
+                ),
+                footLeft: React.createElement("div", { className: "small" },
+                    "Черновик можно сохранить без прохождения самооценки и порогов",
+                    nextStepsUnique.length > 0 ? ":" : "",
+                    nextStepsUnique.length > 0 && React.createElement("ul", { 
+                        className: "list", 
+                        style: { marginTop: 4 } 
+                    }, nextStepsUnique.map((s, i) =>
+                        React.createElement("li", { key: i }, s)
+                    ))
+                ),
+                footRight: React.createElement(React.Fragment, null,
+                    React.createElement("button", {
+                        className: "btn",
+                        onClick: () => submit("черновик")
+                    }, "Сохранить как черновик"),
+                    React.createElement("button", {
+                        className: "btn primary",
+                        onClick: () => submit("готов"),
+                        disabled: !canSave,
+                        "aria-disabled": !canSave
+                    }, "Сохранить")
+                )
+            }, React.createElement("div", { className: "row cols-2" },
+                React.createElement("div", null,
+                    React.createElement("div", { className: "label" }, "• Название проекта"),
+                    React.createElement("input", {
+                        className: "input",
+                        value: title,
+                        onChange: (e) => setTitle(e.target.value),
+                        "aria-invalid": !!errors.title,
+                        "aria-describedby": errors.title ? "err-title" : undefined,
+                        placeholder: "Кратко суть решения"
+                    }),
+                    errors.title && React.createElement("div", { 
+                        id: "err-title", 
+                        className: "small", 
+                        style: { color: "var(--red)" } 
+                    }, errors.title)
+                ),
+                React.createElement("div", null,
+                    React.createElement("div", { className: "label" }, "• Название команды"),
+                    React.createElement("input", {
+                        className: "input",
+                        value: teamName,
+                        onChange: (e) => setTeamName(e.target.value),
+                        "aria-invalid": !!errors.teamName,
+                        "aria-describedby": errors.teamName ? "err-team" : undefined,
+                        placeholder: "Команда..."
+                    }),
+                    errors.teamName && React.createElement("div", { 
+                        id: "err-team", 
+                        className: "small", 
+                        style: { color: "var(--red)" } 
+                    }, errors.teamName)
+                )
+            ),
+
+            React.createElement(TagsInput, {
+                label: "Команда — ФИО участников",
+                values: teamMembers,
+                setValues: setTeamMembers,
+                placeholder: "Добавьте ФИО и нажмите Enter",
+                ariaLabel: "Команда — ФИО участников"
+            }),
+
+            React.createElement("div", { className: "row cols-2" },
+                React.createElement("div", null,
+                    React.createElement("div", { className: "label" }, "• Заказчик"),
+                    React.createElement("select", {
+                        className: "select",
+                        value: customer,
+                        onChange: (e) => setCustomer(e.target.value),
+                        "aria-invalid": !!errors.customer,
+                        "aria-describedby": errors.customer ? "err-cust" : undefined
+                    }, React.createElement("option", { value: "" }, "Выберите заказчика"),
+                    CUSTOMERS.map((c) =>
+                        React.createElement("option", { key: c, value: c }, c)
+                    )),
+                    errors.customer && React.createElement("div", { 
+                        id: "err-cust", 
+                        className: "small", 
+                        style: { color: "var(--red)" } 
+                    }, errors.customer)
+                ),
+                React.createElement("div", null,
+                    React.createElement("div", { className: "label" }, "• Направление"),
+                    React.createElement("select", {
+                        className: "select",
+                        value: directionName,
+                        onChange: (e) => onDirectionChange(e.target.value),
+                        "aria-invalid": !!errors.directionName,
+                        "aria-describedby": errors.directionName ? "err-dir" : undefined
+                    }, React.createElement("option", { value: "" }, "Выберите направление"),
+                    directions.map((d) =>
+                        React.createElement("option", { key: d.code, value: d.name }, d.name)
+                    )),
+                    errors.directionName && React.createElement("div", { 
+                        id: "err-dir", 
+                        className: "small", 
+                        style: { color: "var(--red)" } 
+                    }, errors.directionName)
+                )
+            ),
+
+            React.createElement(TagsInput, {
+                label: "Целевая аудитория",
+                values: targetAudience,
+                setValues: setTargetAudience,
+                placeholder: "Добавьте аудитории и нажмите Enter",
+                ariaLabel: "Целевая аудитория"
+            }),
+
+            React.createElement(MultiSelectDropdown, {
+                label: "Эффекты (выберите)",
+                options: EFFECT_OPTIONS,
+                values: effectTags,
+                setValues: setEffectTags,
+                defs: EFFECT_DEFINITIONS
+            }),
+            effSugg.length > 0 && React.createElement("div", { 
+                className: "small", 
+                style: { marginTop: -6 } 
+            }, "Предложить эффекты: ", React.createElement("span", { className: "chips" },
+                effSugg.map((s) =>
+                    React.createElement(Chip, { 
+                        key: s, 
+                        onClick: () => setEffectTags([...effectTags, s]) 
+                    }, s, " +")
+                )
+            )),
+
+            React.createElement(MultiSelectDropdown, {
+                label: "Теги ДИТ (опционально)",
+                options: DIT_TAGS,
+                values: DITTags,
+                setValues: setDITTags
+            }),
+            ditSugg.length > 0 && React.createElement("div", { 
+                className: "small", 
+                style: { marginTop: -6 } 
+            }, "Предложить теги: ", React.createElement("span", { className: "chips" },
+                ditSugg.map((s) =>
+                    React.createElement(Chip, { 
+                        key: s, 
+                        onClick: () => setDITTags([...DITTags, s]) 
+                    }, s, " +")
+                )
+            )),
+
+            React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "Краткое описание (опционально)"),
+                React.createElement("textarea", {
+                    className: "input textarea",
+                    value: shortDescription,
+                    onChange: (e) => setShortDescription(e.target.value),
+                    placeholder: "Опишите решение и ожидаемый эффект"
+                })
+            ),
+
+            // Самооценка требований
+            React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "Самооценка соответствия требованиям направления"),
+                reqs.length === 0 ? React.createElement("div", { className: "small" }, "Выберите направление — чек-лист появится автоматически.") :
+                React.createElement("div", { className: "row" },
+                    React.createElement("div", { className: "sa-meta" },
+                        React.createElement("span", { className: "small" }, "Отметьте все пункты и заполните обоснования — без этого нельзя выполнить финальное сохранение."),
+                        React.createElement(Badge, { 
+                            kind: reqs.length > 0 && selfChecks.filter(Boolean).length === reqs.length ? "ok" : "muted" 
+                        }, "Отмечено ", selfChecks.filter(Boolean).length, "/", reqs.length),
+                        React.createElement(Badge, { 
+                            kind: notesOkFlags.every(Boolean) ? "ok" : "muted" 
+                        }, "Обоснования ", notesOkFlags.filter(Boolean).length, "/", reqs.length)
+                    ),
+                    (!allChecked || !allNotesOk) && React.createElement("div", { 
+                        className: "small", 
+                        style: { color: "var(--yellow)" } 
+                    }, "Некоторые пункты не отмечены или без обоснований. Наведите на пункт — подсказка в тултипе."),
+                    allNotesEmpty && React.createElement("div", { 
+                        className: "small", 
+                        style: { color: "var(--yellow)" } 
+                    }, "Пока нет ни одного обоснования — добавьте по 1–2 предложения под каждый отмеченный пункт."),
+                    pilotTriadCount === 0 && React.createElement("div", { 
+                        className: "small", 
+                        style: { color: "var(--yellow)" } 
+                    }, "Чтобы продвинуться, укажите площадку пилота, хотя бы 1 источник данных и 1 систему/API."),
+                    computed.fit < 20 && React.createElement("div", { 
+                        className: "small", 
+                        style: { color: "var(--yellow)" } 
+                    }, "Fit низкий: уточните эффекты и заказчика, чтобы повысить релевантность."),
+                    React.createElement("ul", { className: "sa-list" }, reqs.map((req, idx) => {
+                        const checked = !!selfChecks[idx];
+                        const note = selfNotes[idx] || "";
+                        const noteOk = note.trim().length >= MIN_NOTE_CHARS && !isTrivialNote(note);
+                        const missing = !checked || !noteOk;
+                        const example = REQ_EXAMPLES[req] || DEFAULT_REQ_EXAMPLE;
+                        return React.createElement("li", {
+                            key: idx,
+                            className: "sa-item " + (missing ? "missing" : ""),
+                            title: "Отметьте и добавьте короткое обоснование"
+                        }, React.createElement("input", {
+                            type: "checkbox",
+                            checked,
+                            onChange: (e) => {
+                                const arr = selfChecks.slice();
+                                arr[idx] = e.target.checked;
+                                setSelfChecks(arr);
+                            },
+                            "aria-label": `Подтвердить: ${req}`
+                        }), React.createElement("div", null,
+                            React.createElement("div", { 
+                                className: "small", 
+                                style: { color: "inherit", marginBottom: 6 } 
+                            }, req),
+                            React.createElement("input", {
+                                className: "input note-input",
+                                value: note,
+                                onChange: (e) => {
+                                    const arr = selfNotes.slice();
+                                    arr[idx] = e.target.value;
+                                    setSelfNotes(arr);
+                                },
+                                placeholder: "Коротко опишите, как выполняется требование",
+                                "aria-label": `Обоснование: ${req}`,
+                                "aria-invalid": !noteOk
+                            }),
+                            React.createElement("div", { 
+                                className: "small", 
+                                style: { marginTop: 4 } 
+                            }, "Коротко: как именно решение выполняет требование (1–2 предложения)."),
+                            React.createElement("div", { 
+                                className: "small", 
+                                style: { marginTop: 2, color: "#334155" } 
+                            }, example)
+                        ));
+                    }))
+                )
+            ),
+
+            // Мягкие вопросы (UI-only)
+            React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "Мягкие вопросы (не влияют на блокировку сохранения)"),
+                React.createElement("div", { className: "softq" }, SOFT_QUESTIONS.map((q, i) => {
+                    const val = softScores[i] || 0;
+                    const setVal = (v) => {
+                        const arr = softScores.slice();
+                        arr[i] = v;
+                        setSoftScores(arr);
+                    };
+                    return React.createElement("div", { 
+                        key: i, 
+                        className: "softq-item " + (val > 0 && val <= 2 ? "low" : "") 
+                    }, React.createElement("div", { 
+                        className: "small", 
+                        style: { color: "#0f172a" } 
+                    }, q), React.createElement("div", { 
+                        className: "chips", 
+                        role: "radiogroup", 
+                        "aria-label": q 
+                    }, [1, 2, 3, 4, 5].map((n) =>
+                        React.createElement("label", { 
+                            key: n, 
+                            className: "chip", 
+                            style: { cursor: "pointer" } 
+                        }, React.createElement("input", {
+                            type: "radio",
+                            name: `softq-${i}`,
+                            checked: val === n,
+                            onChange: () => setVal(n),
+                            "aria-label": `${q}: ${n}`
+                        }), React.createElement("span", null, n))
+                    ), val > 0 && val <= 2 && React.createElement(Badge, { kind: "warn" }, "Низкая оценка")));
+                }))
+            ),
+
+            // Пилот
+            React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "Как пропилотировать (опционально)"),
+                React.createElement("div", { className: "row cols-2" },
+                    React.createElement("div", null,
+                        React.createElement("div", { className: "label" }, "Площадка пилота"),
+                        React.createElement("input", {
+                            className: "input",
+                            value: pilotSite,
+                            onChange: (e) => setPilotSite(e.target.value),
+                            placeholder: "Линия/маршрут/депо/причал"
+                        })
+                    ),
+                    React.createElement("div", null,
+                        React.createElement("div", { className: "label" }, "Юридические согласования"),
+                        React.createElement("input", {
+                            className: "input",
+                            value: pilotLegal,
+                            onChange: (e) => setPilotLegal(e.target.value),
+                            placeholder: "Ключевые юридические условия"
+                        })
+                    )
+                ),
+
+                dsPresets.length > 0 && React.createElement("div", { 
+                    className: "small", 
+                    style: { marginTop: 6 } 
+                }, "Быстрые пресеты (источники): ", React.createElement("span", { className: "chips" },
+                    dsPresets.map((s) =>
+                        React.createElement(Chip, { 
+                            key: s, 
+                            onClick: () => setPilotDataSources([...pilotDataSources, s]) 
+                        }, s, " +")
+                    )
+                )),
+                React.createElement(TagsInput, {
+                    label: "Источники данных",
+                    values: pilotDataSources,
+                    setValues: setPilotDataSources,
+                    placeholder: "Добавьте источники и нажмите Enter",
+                    ariaLabel: "Источники данных"
+                }),
+
+                intPresets.length > 0 && React.createElement("div", { 
+                    className: "small", 
+                    style: { marginTop: 6 } 
+                }, "Быстрые пресеты (точки подключения): ", React.createElement("span", { className: "chips" },
+                    intPresets.map((s) =>
+                        React.createElement(Chip, { 
+                            key: s, 
+                            onClick: () => setPilotIntegrations([...pilotIntegrations, s]) 
+                        }, s, " +")
+                    )
+                )),
+                React.createElement(TagsInput, {
+                    label: "Точки подключения (системы/API)",
+                    values: pilotIntegrations,
+                    setValues: setPilotIntegrations,
+                    placeholder: "Добавьте системы/API и нажмите Enter",
+                    ariaLabel: "Точки подключения (системы/API)"
+                }),
+
+                React.createElement("div", { className: "row cols-2" },
+                    React.createElement("div", null,
+                        React.createElement("div", { className: "label" }, "Ресурсы"),
+                        React.createElement("textarea", {
+                            className: "input textarea",
+                            value: pilotResources,
+                            onChange: (e) => setPilotResources(e.target.value),
+                            placeholder: "Команда, бюджет, оборудование и т.д."
+                        })
+                    ),
+                    React.createElement("div", null,
+                        React.createElement("div", { className: "label" }, "Шаги/план"),
+                        React.createElement("textarea", {
+                            className: "input textarea",
+                            value: pilotSteps,
+                            onChange: (e) => setPilotSteps(e.target.value),
+                            placeholder: "Основные шаги и сроки"
+                        })
+                    )
+                ),
+                React.createElement("div", null,
+                    React.createElement("div", { className: "label" }, "Критерии успеха"),
+                    React.createElement("textarea", {
+                        className: "input textarea",
+                        value: pilotSuccess,
+                        onChange: (e) => setPilotSuccess(e.target.value),
+                        placeholder: "KPI пилота, метрики достижения"
+                    })
+                )
+            ),
+
+            // Контекст направления
+            React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "Контекст направления"),
+                !dirObj ? React.createElement("div", { className: "small" }, "Выберите направление — покажем кейсы, эффекты и подсказки.") :
+                React.createElement("div", { className: "card" },
+                    React.createElement("div", { className: "card-body" },
+                        React.createElement("div", { className: "small" }, dirObj.description),
+                        (dirObj.openCases || []).length > 0 && React.createElement("div", null,
+                            React.createElement("div", { 
+                                className: "small", 
+                                style: { marginBottom: 4 } 
+                            }, "Открытые кейсы:"),
+                            React.createElement("ul", { className: "list" },
+                                (dirObj.openCases || []).map((c, i) =>
+                                    React.createElement("li", { key: i, className: "small" }, c)
+                                )
+                            )
+                        ),
+                        React.createElement("div", { className: "chips" },
+                            React.createElement("span", { 
+                                className: "small", 
+                                style: { alignSelf: "center" } 
+                            }, "Реком. эффекты:"),
+                            (dirObj.recommendedEffects || []).map((e) =>
+                                React.createElement(Badge, { 
+                                    key: e, 
+                                    title: EFFECT_DEFINITIONS[e] || "" 
+                                }, e)
+                            )
+                        ),
+                        (dirObj.pilotHints || []).length > 0 && React.createElement("div", null,
+                            React.createElement("div", { 
+                                className: "small", 
+                                style: { marginBottom: 4 } 
+                            }, "Подсказки для пилота:"),
+                            React.createElement("ul", { className: "list" },
+                                (dirObj.pilotHints || []).map((h, i) =>
+                                    React.createElement("li", { key: i, className: "small" }, h)
+                                )
+                            )
+                        )
+                    )
+                )
+            ),
+
+            // Причины блокировок
+            unmet.length > 0 && React.createElement("div", { 
+                className: "small", 
+                style: { color: "var(--red)" } 
+            }, unmet.map((m, i) =>
+                React.createElement("div", { key: i }, "• ", m)
+            )));
+        }
+
+        /* ====================== Direction: редактор ====================== */
+        function DirectionDrawer({ open, onClose, initialDirection, onSave }) {
+            const [code, setCode] = useState("");
+            const [name, setName] = useState("");
+            const [description, setDescription] = useState("");
+            const [customersRecommended, setCustomersRecommended] = useState([]);
+            const [openCases, setOpenCases] = useState([]);
+            const [recommendedEffects, setRecommendedEffects] = useState([]);
+            const [recommendedTags, setRecommendedTags] = useState([]);
+            const [pilotHints, setPilotHints] = useState([]);
+            const [stakeholders, setStakeholders] = useState([]);
+            const [requirements, setRequirements] = useState([]);
+
+            useEffect(() => {
+                if (open && initialDirection) {
+                    setCode(initialDirection.code || "");
+                    setName(initialDirection.name || "");
+                    setDescription(initialDirection.description || "");
+                    setCustomersRecommended(initialDirection.customersRecommended || []);
+                    setOpenCases(initialDirection.openCases || []);
+                    setRecommendedEffects(initialDirection.recommendedEffects || []);
+                    setRecommendedTags(initialDirection.recommendedTags || []);
+                    setPilotHints(initialDirection.pilotHints || []);
+                    setStakeholders(initialDirection.stakeholders || []);
+                    setRequirements(initialDirection.requirements || []);
+                }
+            }, [open, initialDirection]);
+
+            const save = () => {
+                const d = {
+                    code,
+                    name,
+                    description,
+                    customersRecommended,
+                    openCases,
+                    recommendedEffects,
+                    recommendedTags,
+                    pilotHints,
+                    stakeholders,
+                    requirements,
+                };
+                onSave(d);
+                onClose();
+            };
+
+            return React.createElement(SideModal, {
+                open: open && !!initialDirection,
+                onClose,
+                title: "Редактировать направление",
+                "aria-label": "Редактировать направление",
+                footRight: React.createElement(React.Fragment, null,
+                    React.createElement("button", { className: "btn", onClick: onClose }, "Отмена"),
+                    React.createElement("button", { className: "btn primary", onClick: save }, "Сохранить")
+                )
+            }, React.createElement("div", { className: "row cols-2" },
+                React.createElement("div", null,
+                    React.createElement("div", { className: "label" }, "Код"),
+                    React.createElement("input", {
+                        className: "input",
+                        value: code,
+                        onChange: (e) => setCode(e.target.value)
+                    })
+                ),
+                React.createElement("div", null,
+                    React.createElement("div", { className: "label" }, "Название"),
+                    React.createElement("input", {
+                        className: "input",
+                        value: name,
+                        onChange: (e) => setName(e.target.value)
+                    })
+                )
+            ), React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "Описание"),
+                React.createElement("textarea", {
+                    className: "input textarea",
+                    value: description,
+                    onChange: (e) => setDescription(e.target.value)
+                })
+            ), React.createElement(CheckboxList, {
+                label: "Реком. заказчики",
+                items: CUSTOMERS,
+                values: customersRecommended,
+                setValues: setCustomersRecommended
+            }), React.createElement(MultiSelectDropdown, {
+                label: "Рекомендуемые эффекты",
+                options: EFFECT_OPTIONS,
+                values: recommendedEffects,
+                setValues: setRecommendedEffects,
+                defs: EFFECT_DEFINITIONS
+            }), React.createElement(MultiSelectDropdown, {
+                label: "Рекомендуемые теги ДИТ",
+                options: DIT_TAGS,
+                values: recommendedTags,
+                setValues: setRecommendedTags
+            }), React.createElement(TagsInput, {
+                label: "Открытые кейсы",
+                values: openCases,
+                setValues: setOpenCases,
+                placeholder: "Добавьте кейс и Enter",
+                ariaLabel: "Открытые кейсы"
+            }), React.createElement(TagsInput, {
+                label: "Подсказки пилота",
+                values: pilotHints,
+                setValues: setPilotHints,
+                placeholder: "Добавьте подсказку и Enter",
+                ariaLabel: "Подсказки пилота"
+            }), React.createElement(TagsInput, {
+                label: "Стейкхолдеры (опц.)",
+                values: stakeholders,
+                setValues: setStakeholders,
+                placeholder: "Добавьте стейкхолдера и Enter",
+                ariaLabel: "Стейкхолдеры"
+            }), React.createElement(TagsInput, {
+                label: "Требования (самооценка)",
+                values: requirements,
+                setValues: setRequirements,
+                placeholder: "Добавьте требование и Enter",
+                ariaLabel: "Требования"
+            }));
+        }
+
+        /* ====================== Главный компонент ====================== */
+        function DirectionsDashboardFixed() {
+            const [directions, setDirections] = useState(loadDirections());
+            const [projects, setProjects] = useState(loadProjects());
+
+            const [dataset, setDataset] = useState("directions");
+            const [view, setView] = useState("cards");
+            const [search, setSearch] = useState("");
+            const debouncedSearch = useDebounced(search, 200);
+            const [filterCustomers, setFilterCustomers] = useState([]);
+            const [filterEffects, setFilterEffects] = useState([]);
+            const [filterDirNames, setFilterDirNames] = useState([]);
+            const [filterTags, setFilterTags] = useState([]);
+
+            const [sortKey, setSortKey] = useState("name");
+            const [sortDir, setSortDir] = useState("asc");
+
+            const [fitOpen, setFitOpen] = useState(false);
+            const [fitItem, setFitItem] = useState(null);
+
+            const [projOpen, setProjOpen] = useState(false);
+            const [projEditing, setProjEditing] = useState(null);
+
+            const [dirOpen, setDirOpen] = useState(false);
+            const [dirEditing, setDirEditing] = useState(null);
+
+            const directionNamesAll = useMemo(() => directions.map((d) => d.name), [directions]);
+
+            const unified = useMemo(() => {
+                if (dataset === "directions") {
+                    return directions.map((d) => ({ type: "direction", ...d }));
+                } else {
+                    return projects.map((p) => ({
+                        type: "project",
+                        ...p,
+                        customers: [p.customer],
+                        description: p.shortDescription || "",
+                    }));
+                }
+            }, [dataset, directions, projects]);
+
+            const filtered = useMemo(() => {
+                const s = debouncedSearch.trim().toLowerCase();
+                return unified.filter((it) => {
+                    if (s.length > 0) {
+                        const hay = [
+                            it.type || "",
+                            it.name || it.directionName || "",
+                            it.title || "",
+                            it.description || it.shortDescription || "",
+                            ...(it.customers || it.customersRecommended || []),
+                            ...(it.effectTags || it.recommendedEffects || []),
+                            ...(it.DITTags || it.recommendedTags || []),
+                            ...(it.openCases || []),
+                            ...(it.stakeholders || []),
+                        ]
+                            .join(" ")
+                            .toLowerCase();
+                        if (!hay.includes(s)) return false;
+                    }
+                    if (filterCustomers.length > 0) {
+                        const arr = it.customers || it.customersRecommended || [];
+                        if (!filterCustomers.some((c) => arr.includes(c))) return false;
+                    }
+                    if (filterEffects.length > 0) {
+                        const arr = it.effectTags || it.recommendedEffects || [];
+                        if (!filterEffects.some((e) => arr.includes(e))) return false;
+                    }
+                    if (filterDirNames.length > 0) {
+                        const name = it.name || it.directionName || "";
+                        if (!filterDirNames.includes(name)) return false;
+                    }
+                    if (filterTags.length > 0) {
+                        const arr = it.DITTags || it.recommendedTags || [];
+                        if (!filterTags.some((t) => arr.includes(t))) return false;
+                    }
+                    return true;
+                });
+            }, [unified, debouncedSearch, filterCustomers, filterEffects, filterDirNames, filterTags]);
+
+            const sorted = useMemo(() => {
+                const arr = [...filtered];
+                const compare = (a, b) => {
+                    const get = (o) => {
+                        switch (sortKey) {
+                            case "name":
+                                return o.type === "project" ? o.title || "" : o.name || "";
+                            case "customer":
+                                return (o.customers || o.customersRecommended || []).join(", ");
+                            case "effects":
+                                return (o.effectTags || o.recommendedEffects || []).join(", ");
+                            case "direction":
+                                return o.type === "project" ? o.directionName || "" : o.name || "";
+                            case "fit":
+                                return o.type === "project" ? o.fitScore || 0 : -1;
+                            case "pilot":
+                                return o.type === "project" ? o.pilotReadiness || 0 : -1;
+                            default:
+                                return "";
+                        }
+                    };
+                    const va = get(a), vb = get(b);
+                    if (typeof va === "number" && typeof vb === "number") return va - vb;
+                    return String(va).localeCompare(String(vb), "ru");
+                };
+                arr.sort(compare);
+                if (sortDir === "desc") arr.reverse();
+                return arr;
+            }, [filtered, sortKey, sortDir]);
+
+            const openFit = (proj) => {
+                setFitItem(proj);
+                setFitOpen(true);
+            };
+            const onOpenAddProject = () => {
+                setProjEditing(null);
+                setProjOpen(true);
+            };
+            const onEditProject = (p) => {
+                setProjEditing(p);
+                setProjOpen(true);
+            };
+            const onEditDirection = (d) => {
+                setDirEditing(d);
+                setDirOpen(true);
+            };
+
+            const addOrUpdateProject = (project) => {
+                setProjects((prev) => {
+                    const exists = prev.some((p) => p.id === project.id);
+                    const next = exists ? prev.map((p) => (p.id === project.id ? project : p)) : [project, ...prev];
+                    saveProjects(next);
+                    return next;
+                });
+                setDataset("projects");
+            };
+
+            const saveDirection = (updated) => {
+                setDirections((prev) => {
+                    const next = prev.map((d) => (d.code === updated.code ? updated : d));
+                    saveDirections(next);
+                    return next;
+                });
+            };
+
+            const exportJSON = () => {
+                const payload =
+                    dataset === "projects"
+                        ? { dataset, timestamp: new Date().toISOString(), items: projects }
+                        : { dataset, timestamp: new Date().toISOString(), items: directions };
+                downloadBlob(JSON.stringify(payload, null, 2), "application/json", `export_${dataset}_${timeStamp()}.json`);
+            };
+
+            const exportCSV = () => {
+                const items = sorted;
+                const headers =
+                    dataset === "projects"
+                        ? ["Тип", "Название", "Заказчик", "Направление", "Эффекты", "ЦА", "Теги ДИТ", "Описание", "Fit", "Pilot", "Статус"]
+                        : ["Тип", "Название", "Описание", "Реком. заказчики", "Открытые кейсы", "Реком. эффекты", "Реком. теги ДИТ", "Стейкхолдеры"];
+                const escape = (v) => {
+                    if (Array.isArray(v)) v = v.join("; ");
+                    if (v == null) v = "";
+                    v = String(v).replace(/"/g, '""');
+                    return `"${v}"`;
+                };
+                const lines = items.map((it) =>
+                    dataset === "projects"
+                        ? [
+                            "Проект",
+                            it.title,
+                            (it.customers || []).join("; "),
+                            it.directionName,
+                            (it.effectTags || []).join("; "),
+                            (it.targetAudience || []).join("; "),
+                            (it.DITTags || []).join("; "),
+                            it.description || "",
+                            it.fitScore ?? "",
+                            it.pilotReadiness ?? "",
+                            it.status || "",
+                        ]
+                            .map(escape)
+                            .join(",")
+                        : [
+                            "Направление",
+                            it.name,
+                            it.description || "",
+                            (it.customersRecommended || []).join("; "),
+                            (it.openCases || []).join(" | "),
+                            (it.recommendedEffects || []).join("; "),
+                            (it.recommendedTags || []).join("; "),
+                            (it.stakeholders || []).join("; "),
+                        ]
+                            .map(escape)
+                            .join(",")
+                );
+                const csv = [headers.map(escape).join(","), ...lines].join("\n");
+                downloadBlob(csv, "text/csv", `export_${dataset}_filtered_${timeStamp()}.csv`);
+            };
+
+            const exportPitch = () => {
+                if (dataset !== "projects") return;
+                const items = sorted.filter((it) => it.type === "project");
+                const parts = [];
+                for (const it of items) {
+                    const dirObj = directions.find((d) => d.name === it.directionName);
+                    const idea = computeIdeaAdequacy(it, dirObj);
+                    parts.push(
+`# ${it.title || "Без названия"}
+Заказчик: ${it.customer || "—"} • Направление: ${it.directionName || "—"} • Эффекты: ${(it.effectTags || []).join(", ") || "—"} • Теги ДИТ: ${(it.DITTags || []).join(", ") || "—"}
+
+${it.shortDescription || "—"}
+
+Пилот: Площадка — ${it.pilot?.site || "—"}; Источники — ${(it.pilot?.dataSources || []).join(", ") || "—"}; Точки подключения — ${(it.pilot?.integrations || []).join(", ") || "—"}
+Юридические согласования: ${it.pilot?.legalApprovals || "—"}
+Ресурсы: ${it.pilot?.resources || "—"}
+Шаги/план: ${it.pilot?.stepsPlan || "—"}
+Критерии успеха: ${it.pilot?.successCriteria || "—"}
+
+Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
+                    );
+                }
+                const md = parts.join("\n\n---\n\n");
+                downloadBlob(md, "text/markdown", `pitch_projects_${timeStamp()}.md`);
+            };
+
+            const importJSON = (json) => {
+                if (!json || typeof json !== "object") {
+                    alert("Некорректный JSON");
+                    return;
+                }
+                if (Array.isArray(json)) {
+                    setProjects((prev) => {
+                        const incoming = json.map((p) => normalizeProject(p, directions));
+                        const merged = [...incoming, ...prev];
+                        saveProjects(merged);
+                        return merged;
+                    });
+                    setDataset("projects");
+                    return;
+                }
+                if (json.dataset === "projects" && Array.isArray(json.items)) {
+                    setProjects((prev) => {
+                        const incoming = json.items.map((p) => normalizeProject(p, directions));
+                        const merged = [...incoming, ...prev];
+                        saveProjects(merged);
+                        return merged;
+                    });
+                    setDataset("projects");
+                } else if (json.dataset === "directions" && Array.isArray(json.items)) {
+                    setDirections(json.items);
+                    saveDirections(json.items);
+                    setDataset("directions");
+                } else {
+                    alert("Ожидается объект { dataset: 'projects'|'directions', items: [...] } или массив проектов");
+                }
+            };
+
+            const clearFilters = () => {
+                setSearch("");
+                setFilterCustomers([]);
+                setFilterEffects([]);
+                setFilterDirNames([]);
+                setFilterTags([]);
+                setSortKey("name");
+                setSortDir("asc");
+            };
+
+            const onSort = (key) => {
+                if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
+                else {
+                    setSortKey(key);
+                    setSortDir("asc");
+                }
+            };
+
+            // Мини‑тур (первый запуск)
+            const [showTour, setShowTour] = useState(() => {
+                try {
+                    return localStorage.getItem(LS_TOUR_KEY) !== "1";
+                } catch {
+                    return true;
+                }
+            });
+            const dismissTour = () => {
+                try {
+                    localStorage.setItem(LS_TOUR_KEY, "1");
+                } catch {}
+                setShowTour(false);
+            };
+
+            return React.createElement("div", { className: "app-shell" },
+                React.createElement("header", { className: "header" },
+                    React.createElement("div", { className: "title" }, "Карта направлений — дашборд (исправлено)"),
+                    React.createElement("div", { className: "spacer" }),
+                    React.createElement("div", { className: "status" },
+                        React.createElement("span", { 
+                            className: "small", 
+                            title: "Данные сохраняются локально (LocalStorage)." 
+                        }, "Сессия сохраняется")
+                    )
+                ),
+
+                React.createElement("section", { className: "toolbar", role: "region", "aria-label": "Фильтры" },
+                    React.createElement("div", { className: "filters" },
+                        React.createElement("div", { style: { position: "relative", flex: "1 1 260px", minWidth: 220 } },
+                            React.createElement("input", {
+                                className: "input",
+                                style: { width: "100%", paddingLeft: 30 },
+                                placeholder: "Поиск (название, описание, теги, эффекты, заказчик)",
+                                value: search,
+                                onChange: (e) => setSearch(e.target.value),
+                                "aria-label": "Поиск"
+                            }),
+                            React.createElement("span", { 
+                                className: "icon", 
+                                style: { position: "absolute", left: 8, top: 9, opacity: .6 } 
+                            }, "🔎")
+                        ),
+
+                        React.createElement(MultiSelectDropdown, {
+                            label: "Фильтр: Заказчик",
+                            options: CUSTOMERS,
+                            values: filterCustomers,
+                            setValues: setFilterCustomers
+                        }),
+                        React.createElement(MultiSelectDropdown, {
+                            label: "Фильтр: Эффект",
+                            options: EFFECT_OPTIONS,
+                            values: filterEffects,
+                            setValues: setFilterEffects,
+                            defs: EFFECT_DEFINITIONS
+                        }),
+                        React.createElement(MultiSelectDropdown, {
+                            label: "Фильтр: Направление",
+                            options: directionNamesAll,
+                            values: filterDirNames,
+                            setValues: setFilterDirNames
+                        }),
+                        React.createElement(MultiSelectDropdown, {
+                            label: "Фильтр: Теги ДИТ",
+                            options: DIT_TAGS,
+                            values: filterTags,
+                            setValues: setFilterTags
+                        })
+                    ),
+
+                    React.createElement("div", { className: "chips", role: "group", "aria-label": "Переключатели данных и вида" },
+                        React.createElement(ToggleGroup, {
+                            ariaLabel: "Данные",
+                            value: dataset,
+                            onChange: (v) => setDataset(v),
+                            items: [
+                                { value: "directions", label: "Направления" },
+                                { value: "projects", label: "Проекты" },
+                            ]
+                        }),
+                        React.createElement(ToggleGroup, {
+                            ariaLabel: "Вид",
+                            value: view,
+                            onChange: (v) => setView(v),
+                            items: [
+                                { value: "cards", label: "Карточки" },
+                                { value: "table", label: "Таблица" },
+                            ]
+                        })
+                    ),
+
+                    React.createElement("div", { className: "actions" },
+                        React.createElement("button", {
+                            className: "btn",
+                            onClick: () => exportCSV(),
+                            "aria-label": "Экспорт CSV"
+                        }, "Экспорт CSV"),
+                        React.createElement("button", {
+                            className: "btn",
+                            onClick: () => exportJSON(),
+                            "aria-label": "Экспорт JSON"
+                        }, "Экспорт JSON"),
+                        dataset === "projects" && React.createElement("button", {
+                            className: "btn",
+                            onClick: () => exportPitch(),
+                            "aria-label": "Экспорт Pitch"
+                        }, "Экспорт Pitch"),
+                        React.createElement("label", {
+                            className: "btn",
+                            "aria-label": "Импорт JSON",
+                            title: "Импорт JSON"
+                        }, "Импорт JSON", React.createElement("input", {
+                            type: "file",
+                            accept: "application/json",
+                            style: { display: "none" },
+                            onChange: (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                    try {
+                                        const json = JSON.parse(String(reader.result || "{}"));
+                                        importJSON(json);
+                                    } catch {
+                                        alert("Не удалось прочитать JSON");
+                                    }
+                                };
+                                reader.readAsText(file);
+                                e.currentTarget.value = "";
+                            }
+                        })),
+                        React.createElement("button", {
+                            className: "btn primary",
+                            onClick: onOpenAddProject,
+                            "aria-label": "Добавить проект"
+                        }, "Добавить проект"),
+                        React.createElement("button", {
+                            className: "btn ghost",
+                            onClick: clearFilters,
+                            "aria-label": "Сбросить фильтры"
+                        }, "Сбросить")
+                    )
+                ),
+
+                React.createElement("div", { className: "toolbar", style: { borderTop: "none", paddingTop: 0 } },
+                    React.createElement("div", { className: "small" }, "Показано: ", React.createElement("b", null, filtered.length), " из ", unified.length),
+                    React.createElement("div", null),
+                    React.createElement("div", { className: "small" }, "Подсказка: Нажмите Esc чтобы закрыть модалки"),
+                    showTour && React.createElement("div", { 
+                        className: "small", 
+                        style: { gridColumn: "1 / -1", color: "#0f172a" } 
+                    }, React.createElement("div", { className: "chips" },
+                        React.createElement(Badge, { kind: "muted" }, "Мини‑тур"),
+                        React.createElement("span", null, "1) выберите направление, 2) отметьте требования + короткое обоснование, 3) заполните 2–3 поля пилота, 4) откройте Fit‑Check"),
+                        React.createElement("button", {
+                            className: "btn",
+                            onClick: dismissTour,
+                            "aria-label": "Скрыть мини-тур"
+                        }, "Понятно")
+                    ))
+                ),
+
+                view === "cards" ? React.createElement("section", { className: "grid cards", role: "list", "aria-label": "Список карточек" },
+                    sorted.map((it) => {
+                        const isProject = it.type === "project";
+                        const dirObj = isProject ? directions.find((d) => d.name === it.directionName) : null;
+                        const ideaBadgeVal = isProject ? computeIdeaAdequacy(it, dirObj || undefined) : 0;
+                        return React.createElement("div", {
+                            key: isProject ? "p:" + it.id : "d:" + it.code,
+                            className: "card",
+                            role: "listitem"
+                        }, React.createElement("div", { className: "card-head" },
+                            React.createElement("div", null,
+                                React.createElement("div", { 
+                                    style: { fontWeight: 600, display: "flex", alignItems: "center", gap: 8 } 
+                                }, React.createElement("span", null, isProject ? it.title : it.name),
+                                isProject ? React.createElement(Badge, { kind: "muted" }, "Проект") : null),
+                                React.createElement("div", { 
+                                    className: "small", 
+                                    style: { marginTop: 4 } 
+                                }, it.description || "—")
+                            ),
+                            React.createElement("div", { className: "chips" },
+                                (isProject ? it.customers : it.customersRecommended || []).map((c) =>
+                                    React.createElement(Badge, { 
+                                        key: c, 
+                                        title: "Заказчик: " + c 
+                                    }, c)
+                                )
+                            )
+                        ), React.createElement("div", { className: "card-body" },
+                            React.createElement("div", { className: "chips" },
+                                (isProject ? it.effectTags : it.recommendedEffects || []).map((e) =>
+                                    React.createElement(Badge, { 
+                                        key: e, 
+                                        title: EFFECT_DEFINITIONS[e] || "" 
+                                    }, e)
+                                )
+                            ),
+                            isProject ? React.createElement(React.Fragment, null,
+                                React.createElement("div", { className: "small" },
+                                    React.createElement("span", { className: "muted" }, "Направление:"), " ", it.directionName || "—"),
+                                React.createElement("div", { className: "chips" },
+                                    React.createElement("span", { 
+                                        className: "small", 
+                                        style: { alignSelf: "center" } 
+                                    }, "Теги ДИТ:"),
+                                    (it.DITTags || []).map((t) => 
+                                        React.createElement(Badge, { key: t }, t)
+                                    ),
+                                    (it.DITTags || []).length === 0 ? 
+                                    React.createElement("span", { className: "small" }, "—") : null
+                                ),
+                                React.createElement("div", { className: "chips" },
+                                    React.createElement(Badge, { 
+                                        title: "Fit% = 50% совпадения с кейсами + 30% эффекты + 20% заказчик" 
+                                    }, "Fit ", it.fitScore ?? 0, "%"),
+                                    React.createElement(Badge, { 
+                                        title: "Pilot% = доля заполненных полей пилота (site, sources, integrations, legal, resources, steps, success)" 
+                                    }, "Pilot ", it.pilotReadiness ?? 0, "%"),
+                                    React.createElement(Badge, { 
+                                        title: "Idea% = 60% качество обоснований + 40% core пилота" 
+                                    }, "Idea ", ideaBadgeVal, "%")
+                                )
+                            ) : React.createElement(React.Fragment, null,
+                                (it.openCases || []).length > 0 && React.createElement("div", null,
+                                    React.createElement("div", { 
+                                        className: "small", 
+                                        style: { marginBottom: 4 } 
+                                    }, "Открытые кейсы:"),
+                                    React.createElement("ul", { className: "list" },
+                                        (it.openCases || []).map((c, i) =>
+                                            React.createElement("li", { key: i, className: "small" }, c)
+                                        )
+                                    )
+                                ),
+                                React.createElement("div", { className: "chips" },
+                                    React.createElement("span", { 
+                                        className: "small", 
+                                        style: { alignSelf: "center" } 
+                                    }, "Реком. теги:"),
+                                    (it.recommendedTags || []).map((t) => 
+                                        React.createElement(Badge, { key: t }, t)
+                                    ),
+                                    (it.recommendedTags || []).length === 0 ? 
+                                    React.createElement("span", { className: "small" }, "—") : null
+                                )
+                            )
+                        ), React.createElement("div", { className: "card-foot" },
+                            React.createElement("div", { className: "small" }, 
+                                isProject ? "Статус: " + (it.status || "готов") : "Редактируйте данные направления"),
+                            React.createElement("div", { className: "chips" },
+                                isProject ? React.createElement(React.Fragment, null,
+                                    React.createElement("button", {
+                                        className: "btn",
+                                        onClick: () => openFit(it),
+                                        "aria-label": "Fit-Check"
+                                    }, "Fit-Check"),
+                                    React.createElement("button", {
+                                        className: "btn primary",
+                                        onClick: () => onEditProject(it),
+                                        "aria-label": "Редактировать проект"
+                                    }, "Редактировать")
+                                ) : React.createElement("button", {
+                                    className: "btn primary",
+                                    onClick: () => onEditDirection(it),
+                                    "aria-label": "Редактировать направление"
+                                }, "Редактировать направление")
+                            )
+                        ));
+                    }),
+                    sorted.length === 0 && React.createElement("div", { 
+                        className: "small", 
+                        style: { opacity: .8, padding: 16 } 
+                    }, "Ничего не найдено")
+                ) : React.createElement("section", { className: "grid", style: { paddingTop: 0 } },
+                    React.createElement("div", { className: "card", role: "region", "aria-label": "Таблица" },
+                        React.createElement("div", { style: { overflowX: "auto" } },
+                            React.createElement("table", { className: "table" },
+                                React.createElement("thead", null,
+                                    React.createElement("tr", null,
+                                        React.createElement("th", null, 
+                                            React.createElement(SortHeader, {
+                                                label: "Название",
+                                                sortKey: "name",
+                                                currentKey: sortKey,
+                                                sortDir,
+                                                onSort
+                                            })),
+                                        React.createElement("th", null, 
+                                            React.createElement(SortHeader, {
+                                                label: "Заказчик",
+                                                sortKey: "customer",
+                                                currentKey: sortKey,
+                                                sortDir,
+                                                onSort
+                                            })),
+                                        React.createElement("th", null, 
+                                            React.createElement(SortHeader, {
+                                                label: "Эффекты",
+                                                sortKey: "effects",
+                                                currentKey: sortKey,
+                                                sortDir,
+                                                onSort
+                                            })),
+                                        React.createElement("th", null, 
+                                            React.createElement(SortHeader, {
+                                                label: "Направление",
+                                                sortKey: "direction",
+                                                currentKey: sortKey,
+                                                sortDir,
+                                                onSort
+                                            })),
+                                        React.createElement("th", null, 
+                                            React.createElement(SortHeader, {
+                                                label: "Fit",
+                                                sortKey: "fit",
+                                                currentKey: sortKey,
+                                                sortDir,
+                                                onSort
+                                            })),
+                                        React.createElement("th", null, 
+                                            React.createElement(SortHeader, {
+                                                label: "Pilot",
+                                                sortKey: "pilot",
+                                                currentKey: sortKey,
+                                                sortDir,
+                                                onSort
+                                            })),
+                                        React.createElement("th", null, "Действия")
+                                    )
+                                ),
+                                React.createElement("tbody", null,
+                                    sorted.map((it) =>
+                                        React.createElement("tr", {
+                                            key: it.type === "project" ? "p:" + it.id : "d:" + it.code,
+                                            className: "table-row"
+                                        }, React.createElement("td", null,
+                                            React.createElement("div", { 
+                                                style: { fontWeight: 600, display: "flex", alignItems: "center", gap: 6 } 
+                                            }, it.type === "project" ? it.title : it.name,
+                                            it.type === "project" ? 
+                                            React.createElement(Badge, { kind: "muted" }, "Проект") : null),
+                                            React.createElement("div", { className: "small" }, it.description || "—")
+                                        ), React.createElement("td", null,
+                                            React.createElement("div", { className: "chips" },
+                                                (it.customers || it.customersRecommended || []).map((c) =>
+                                                    React.createElement(Badge, { key: c }, c)
+                                                )
+                                            )
+                                        ), React.createElement("td", null,
+                                            React.createElement("div", { className: "chips" },
+                                                (it.effectTags || it.recommendedEffects || []).map((e) =>
+                                                    React.createElement(Badge, { 
+                                                        key: e, 
+                                                        title: EFFECT_DEFINITIONS[e] || "" 
+                                                    }, e)
+                                                )
+                                            )
+                                        ), React.createElement("td", null, 
+                                            it.type === "project" ? it.directionName || "—" : it.name),
+                                        React.createElement("td", null, 
+                                            it.type === "project" ? 
+                                            React.createElement(Badge, null, "Fit ", it.fitScore ?? 0, "%") : "—"),
+                                        React.createElement("td", null, 
+                                            it.type === "project" ? 
+                                            React.createElement(Badge, null, "Pilot ", it.pilotReadiness ?? 0, "%") : "—"),
+                                        React.createElement("td", null,
+                                            React.createElement("div", { className: "chips" },
+                                                it.type === "project" ? React.createElement(React.Fragment, null,
+                                                    React.createElement("button", {
+                                                        className: "btn",
+                                                        onClick: () => openFit(it),
+                                                        "aria-label": "Fit-Check"
+                                                    }, "Fit-Check"),
+                                                    React.createElement("button", {
+                                                        className: "btn primary",
+                                                        onClick: () => onEditProject(it),
+                                                        "aria-label": "Редактировать проект"
+                                                    }, "Редактировать")
+                                                ) : React.createElement("button", {
+                                                    className: "btn primary",
+                                                    onClick: () => onEditDirection(it),
+                                                    "aria-label": "Редактировать"
+                                                }, "Редактировать")
+                                            )
+                                        ))
+                                    ),
+                                    sorted.length === 0 && React.createElement("tr", null,
+                                        React.createElement("td", { 
+                                            colSpan: 7, 
+                                            className: "small", 
+                                            style: { textAlign: "center", padding: 16 } 
+                                        }, "Ничего не найдено")
+                                    )
+                                )
+                            )
+                        )
+                    )
+                ),
+
+                React.createElement(SideModal, {
+                    open: fitOpen && !!fitItem,
+                    title: "Fit-Check",
+                    onClose: () => setFitOpen(false),
+                    headExtra: fitItem ? React.createElement("div", { className: "chips" },
+                        React.createElement(Badge, { 
+                            title: "Fit% = 50% текстовые совпадения + 30% эффекты + 20% заказчик" 
+                        }, "Fit ", fitItem.fitScore ?? 0, "%"),
+                        React.createElement(Badge, { 
+                            title: "Pilot% = доля заполненных полей пилота" 
+                        }, "Pilot ", fitItem.pilotReadiness ?? 0, "%"),
+                        React.createElement(Badge, { 
+                            title: "Idea% = 60% качество обоснований + 40% core пилота" 
+                        }, "Idea ", computeIdeaAdequacy(fitItem, directions.find((d) => d.name === fitItem.directionName)))
+                    ) : null,
+                    footRight: React.createElement("button", {
+                        className: "btn primary",
+                        onClick: () => setFitOpen(false)
+                    }, "Готово")
+                }, fitItem && React.createElement(React.Fragment, null,
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { fontWeight: 600 } }, fitItem.title),
+                        React.createElement("div", { className: "small" }, "Направление: ", fitItem.directionName || "—")
+                    ),
+                    React.createElement("div", { className: "chips" },
+                        (fitItem.effectTags || []).map((e) =>
+                            React.createElement(Badge, { 
+                                key: e, 
+                                title: EFFECT_DEFINITIONS[e] || "" 
+                            }, e)
+                        ),
+                        (fitItem.DITTags || []).map((t) => 
+                            React.createElement(Badge, { key: t }, t)
+                        )
+                    ),
+                    React.createElement("hr", { className: "sep" }),
+                    React.createElement("div", { className: "small" },
+                        "Требования выбранного направления должны быть подтверждены чек‑листом и короткими обоснованиями. Без этого нельзя финально сохранить."
+                    ),
+                    (() => {
+                        const dir = directions.find((d) => d.name === fitItem.directionName);
+                        if (!dir) return React.createElement("div", { className: "small" }, "Выберите направление в карточке проекта.");
+                        return React.createElement("div", null,
+                            React.createElement("div", { className: "label" }, "Требования выбранного направления"),
+                            React.createElement("ul", { className: "list" },
+                                (dir.requirements || []).map((r, i) =>
+                                    React.createElement("li", { key: i, className: "small" }, r)
+                                )
+                            )
+                        );
+                    })(),
+                    (() => {
+                        // Похожие проекты: то же направление + совпадает заказчик или пересечение эффектов; топ-5 по Fit
+                        const sims = projects
+                            .filter(
+                                (p) =>
+                                    p.id !== fitItem.id &&
+                                    p.directionName === fitItem.directionName &&
+                                    (p.customer === fitItem.customer ||
+                                      (p.effectTags || []).some((t) => (fitItem.effectTags || []).includes(t)))
+                            )
+                            .sort((a, b) => (b.fitScore || 0) - (a.fitScore || 0))
+                            .slice(0, 5);
+                        if (sims.length === 0) return null;
+                        return React.createElement("div", null,
+                            React.createElement("div", { className: "label", style: { marginTop: 8 } }, "Похожие проекты"),
+                            React.createElement("ul", { className: "list" },
+                                sims.map((sp) =>
+                                    React.createElement("li", { 
+                                        key: sp.id, 
+                                        className: "small", 
+                                        style: { marginBottom: 4 } 
+                                    }, React.createElement("span", { style: { fontWeight: 600 } }, sp.title),
+                                    React.createElement("span", null, " — "),
+                                    React.createElement("span", { className: "chips" },
+                                        React.createElement(Badge, null, "Fit ", sp.fitScore ?? 0, "%"),
+                                        (sp.effectTags || []).map((e) => 
+                                            React.createElement(Badge, { key: sp.id + e }, e)
+                                        )
+                                    ))
+                                )
+                            )
+                        );
+                    })()
+                )),
+
+                React.createElement(ProjectDrawer, {
+                    open: projOpen,
+                    onClose: () => setProjOpen(false),
+                    directions,
+                    initialProject: projEditing,
+                    onSaveFinal: (p) => addOrUpdateProject(p),
+                    onSaveDraft: (p) => addOrUpdateProject(p)
+                }),
+
+                React.createElement(DirectionDrawer, {
+                    open: dirOpen,
+                    onClose: () => setDirOpen(false),
+                    initialDirection: dirEditing,
+                    onSave: (d) => saveDirection(d)
+                })
+            );
+        }
+
+        // ====================== ЗАПУСК ПРИЛОЖЕНИЯ ======================
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(DirectionsDashboardFixed));
+    </script>
+</body>
+</html>
