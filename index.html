@@ -50,7 +50,7 @@
           border: 1px solid var(--border);
           background: #ffffff;
           color: var(--text);
-          border-radius: 10px;
+          borderRadius: 10px;
           padding: 8px 10px;
           font-size: 13px;
         }
@@ -369,6 +369,7 @@
         const LS_DIRECTIONS_V2 = "mvb_directions_v2";
         const LS_PROJECTS_V2 = "mvb_projects_v2";
         const LS_TOUR_KEY = "mvb_tour_dismissed_v1";
+        const LS_FTIM_PROJECTS = "mvb_ftim_projects_v1";
 
         function tryParse(raw) {
             try {
@@ -645,6 +646,25 @@
                 }
             } catch {}
             localStorage.setItem(LS_PROJECTS_V3, JSON.stringify([]));
+            return [];
+        }
+
+        /* ====================== Проекты от ФТИМ ====================== */
+        function saveFTIMProjects(arr) {
+            try {
+                localStorage.setItem(LS_FTIM_PROJECTS, JSON.stringify(arr));
+            } catch {}
+        }
+
+        function loadFTIMProjects() {
+            try {
+                const raw = localStorage.getItem(LS_FTIM_PROJECTS);
+                if (raw) {
+                    const arr = JSON.parse(raw);
+                    if (Array.isArray(arr)) return arr;
+                }
+            } catch {}
+            localStorage.setItem(LS_FTIM_PROJECTS, JSON.stringify([]));
             return [];
         }
 
@@ -1889,10 +1909,161 @@
             ));
         }
 
+        /* ====================== Проекты от ФТИМ ====================== */
+        function FTIMProjectDrawer({ open, onClose, directions, initialProject, onSave }) {
+            const isEdit = !!(initialProject && initialProject.id);
+            
+            const [projectName, setProjectName] = useState("");
+            const [description, setDescription] = useState("");
+            const [currentStatus, setCurrentStatus] = useState("");
+            const [pilotSite, setPilotSite] = useState("");
+            const [status, setStatus] = useState("");
+            const [directionName, setDirectionName] = useState("");
+            const [errors, setErrors] = useState({});
+
+            // Статусы для выпадающего списка
+            const STATUS_OPTIONS = [
+                "Идея",
+                "В разработке", 
+                "Пилот",
+                "Внедрение",
+                "Завершен",
+                "Приостановлен"
+            ];
+
+            useEffect(() => {
+                if (open) {
+                    if (isEdit && initialProject) {
+                        setProjectName(initialProject.projectName || "");
+                        setDescription(initialProject.description || "");
+                        setCurrentStatus(initialProject.currentStatus || "");
+                        setPilotSite(initialProject.pilotSite || "");
+                        setStatus(initialProject.status || "");
+                        setDirectionName(initialProject.directionName || "");
+                    } else {
+                        setProjectName("");
+                        setDescription("");
+                        setCurrentStatus("");
+                        setPilotSite("");
+                        setStatus("");
+                        setDirectionName("");
+                    }
+                    setErrors({});
+                }
+            }, [open, isEdit, initialProject]);
+
+            const validate = () => {
+                const e = {};
+                if (!projectName.trim()) e.projectName = "Введите название проекта";
+                if (!directionName) e.directionName = "Выберите направление";
+                setErrors(e);
+                return Object.keys(e).length === 0;
+            };
+
+            const save = () => {
+                if (!validate()) return;
+                
+                const ftimProject = {
+                    id: isEdit && initialProject ? initialProject.id : uuid(),
+                    projectName: projectName.trim(),
+                    description: description.trim(),
+                    currentStatus: currentStatus.trim(),
+                    pilotSite: pilotSite.trim(),
+                    status,
+                    directionName,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                onSave(ftimProject);
+                onClose();
+            };
+
+            return React.createElement(SideModal, {
+                open,
+                onClose,
+                title: isEdit ? "Редактировать проект от ФТИМ" : "Добавить проект от ФТИМ",
+                "aria-label": "Форма проекта от ФТИМ",
+                footRight: React.createElement(React.Fragment, null,
+                    React.createElement("button", { className: "btn", onClick: onClose }, "Отмена"),
+                    React.createElement("button", { 
+                        className: "btn primary", 
+                        onClick: save 
+                    }, isEdit ? "Сохранить" : "Добавить")
+                )
+            }, React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "• Проект"),
+                React.createElement("input", {
+                    className: "input",
+                    value: projectName,
+                    onChange: (e) => setProjectName(e.target.value),
+                    placeholder: "Название проекта",
+                    "aria-invalid": !!errors.projectName,
+                    "aria-describedby": errors.projectName ? "err-project" : undefined
+                }),
+                errors.projectName && React.createElement("div", { 
+                    id: "err-project", 
+                    className: "small", 
+                    style: { color: "var(--red)" } 
+                }, errors.projectName)
+            ), React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "Описание"),
+                React.createElement("textarea", {
+                    className: "input textarea",
+                    value: description,
+                    onChange: (e) => setDescription(e.target.value),
+                    placeholder: "Описание проекта"
+                })
+            ), React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "Текущий статус"),
+                React.createElement("textarea", {
+                    className: "input textarea",
+                    value: currentStatus,
+                    onChange: (e) => setCurrentStatus(e.target.value),
+                    placeholder: "Текущее состояние проекта, достижения, проблемы"
+                })
+            ), React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "Пилотная площадка"),
+                React.createElement("input", {
+                    className: "input",
+                    value: pilotSite,
+                    onChange: (e) => setPilotSite(e.target.value),
+                    placeholder: "Место проведения пилота"
+                })
+            ), React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "Статус"),
+                React.createElement("select", {
+                    className: "select",
+                    value: status,
+                    onChange: (e) => setStatus(e.target.value)
+                }, React.createElement("option", { value: "" }, "Выберите статус"),
+                STATUS_OPTIONS.map((s) =>
+                    React.createElement("option", { key: s, value: s }, s)
+                ))
+            ), React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "• Направление"),
+                React.createElement("select", {
+                    className: "select",
+                    value: directionName,
+                    onChange: (e) => setDirectionName(e.target.value),
+                    "aria-invalid": !!errors.directionName,
+                    "aria-describedby": errors.directionName ? "err-dir" : undefined
+                }, React.createElement("option", { value: "" }, "Выберите направление"),
+                directions.map((d) =>
+                    React.createElement("option", { key: d.code, value: d.name }, d.name)
+                )),
+                errors.directionName && React.createElement("div", { 
+                    id: "err-dir", 
+                    className: "small", 
+                    style: { color: "var(--red)" } 
+                }, errors.directionName)
+            ));
+        }
+
         /* ====================== Главный компонент ====================== */
         function DirectionsDashboardFixed() {
             const [directions, setDirections] = useState(loadDirections());
             const [projects, setProjects] = useState(loadProjects());
+            const [ftimProjects, setFtimProjects] = useState(loadFTIMProjects());
 
             const [dataset, setDataset] = useState("directions");
             const [view, setView] = useState("cards");
@@ -1917,20 +2088,33 @@
 
             const [dirCreateOpen, setDirCreateOpen] = useState(false);
 
+            const [ftimProjOpen, setFtimProjOpen] = useState(false);
+            const [ftimProjEditing, setFtimProjEditing] = useState(null);
+
             const directionNamesAll = useMemo(() => directions.map((d) => d.name), [directions]);
 
             const unified = useMemo(() => {
                 if (dataset === "directions") {
                     return directions.map((d) => ({ type: "direction", ...d }));
-                } else {
+                } else if (dataset === "projects") {
                     return projects.map((p) => ({
                         type: "project",
                         ...p,
                         customers: [p.customer],
                         description: p.shortDescription || "",
                     }));
+                } else if (dataset === "ftimProjects") {
+                    return ftimProjects.map((p) => ({
+                        type: "ftimProject",
+                        ...p,
+                        name: p.projectName,
+                        description: p.description,
+                        customers: [],
+                        directionName: p.directionName
+                    }));
                 }
-            }, [dataset, directions, projects]);
+                return [];
+            }, [dataset, directions, projects, ftimProjects]);
 
             const filtered = useMemo(() => {
                 const s = debouncedSearch.trim().toLowerCase();
@@ -1977,13 +2161,17 @@
                     const get = (o) => {
                         switch (sortKey) {
                             case "name":
-                                return o.type === "project" ? o.title || "" : o.name || "";
+                                return o.type === "project" ? o.title || "" : 
+                                       o.type === "ftimProject" ? o.projectName || "" : 
+                                       o.name || "";
                             case "customer":
                                 return (o.customers || o.customersRecommended || []).join(", ");
                             case "effects":
                                 return (o.effectTags || o.recommendedEffects || []).join(", ");
                             case "direction":
-                                return o.type === "project" ? o.directionName || "" : o.name || "";
+                                return o.type === "project" ? o.directionName || "" : 
+                                       o.type === "ftimProject" ? o.directionName || "" :
+                                       o.name || "";
                             case "fit":
                                 return o.type === "project" ? o.fitScore || 0 : -1;
                             case "pilot":
@@ -2020,6 +2208,14 @@
             const onOpenCreateDirection = () => {
                 setDirCreateOpen(true);
             };
+            const onOpenAddFTIMProject = () => {
+                setFtimProjEditing(null);
+                setFtimProjOpen(true);
+            };
+            const onEditFTIMProject = (p) => {
+                setFtimProjEditing(p);
+                setFtimProjOpen(true);
+            };
 
             const addOrUpdateProject = (project) => {
                 setProjects((prev) => {
@@ -2029,6 +2225,26 @@
                     return next;
                 });
                 setDataset("projects");
+            };
+
+            const addOrUpdateFTIMProject = (project) => {
+                setFtimProjects((prev) => {
+                    const exists = prev.some((p) => p.id === project.id);
+                    const next = exists ? prev.map((p) => (p.id === project.id ? project : p)) : [project, ...prev];
+                    saveFTIMProjects(next);
+                    return next;
+                });
+                setDataset("ftimProjects");
+            };
+
+            const deleteFTIMProject = (id) => {
+                if (confirm("Удалить проект от ФТИМ?")) {
+                    setFtimProjects((prev) => {
+                        const next = prev.filter((p) => p.id !== id);
+                        saveFTIMProjects(next);
+                        return next;
+                    });
+                }
             };
 
             const saveDirection = (updated) => {
@@ -2059,6 +2275,8 @@
                 const payload =
                     dataset === "projects"
                         ? { dataset, timestamp: new Date().toISOString(), items: projects }
+                        : dataset === "ftimProjects"
+                        ? { dataset, timestamp: new Date().toISOString(), items: ftimProjects }
                         : { dataset, timestamp: new Date().toISOString(), items: directions };
                 downloadBlob(JSON.stringify(payload, null, 2), "application/json", `export_${dataset}_${timeStamp()}.json`);
             };
@@ -2068,6 +2286,8 @@
                 const headers =
                     dataset === "projects"
                         ? ["Тип", "Название", "Заказчик", "Направление", "Эффекты", "ЦА", "Теги ДИТ", "Описание", "Fit", "Pilot", "Статус"]
+                        : dataset === "ftimProjects"
+                        ? ["Тип", "Проект", "Описание", "Текущий статус", "Пилотная площадка", "Статус", "Направление"]
                         : ["Тип", "Название", "Описание", "Реком. заказчики", "Открытые кейсы", "Реком. эффекты", "Реком. теги ДИТ", "Стейкхолдеры"];
                 const escape = (v) => {
                     if (Array.isArray(v)) v = v.join("; ");
@@ -2089,6 +2309,18 @@
                             it.fitScore ?? "",
                             it.pilotReadiness ?? "",
                             it.status || "",
+                        ]
+                            .map(escape)
+                            .join(",")
+                        : dataset === "ftimProjects"
+                        ? [
+                            "Проект ФТИМ",
+                            it.projectName,
+                            it.description || "",
+                            it.currentStatus || "",
+                            it.pilotSite || "",
+                            it.status || "",
+                            it.directionName || "",
                         ]
                             .map(escape)
                             .join(",")
@@ -2162,8 +2394,12 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     setDirections(json.items);
                     saveDirections(json.items);
                     setDataset("directions");
+                } else if (json.dataset === "ftimProjects" && Array.isArray(json.items)) {
+                    setFtimProjects(json.items);
+                    saveFTIMProjects(json.items);
+                    setDataset("ftimProjects");
                 } else {
-                    alert("Ожидается объект { dataset: 'projects'|'directions', items: [...] } или массив проектов");
+                    alert("Ожидается объект { dataset: 'projects'|'directions'|'ftimProjects', items: [...] } или массив проектов");
                 }
             };
 
@@ -2229,31 +2465,33 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                             }, "🔎")
                         ),
 
-                        React.createElement(MultiSelectDropdown, {
-                            label: "Фильтр: Заказчик",
-                            options: CUSTOMERS,
-                            values: filterCustomers,
-                            setValues: setFilterCustomers
-                        }),
-                        React.createElement(MultiSelectDropdown, {
-                            label: "Фильтр: Эффект",
-                            options: EFFECT_OPTIONS,
-                            values: filterEffects,
-                            setValues: setFilterEffects,
-                            defs: EFFECT_DEFINITIONS
-                        }),
-                        React.createElement(MultiSelectDropdown, {
-                            label: "Фильтр: Направление",
-                            options: directionNamesAll,
-                            values: filterDirNames,
-                            setValues: setFilterDirNames
-                        }),
-                        React.createElement(MultiSelectDropdown, {
-                            label: "Фильтр: Теги ДИТ",
-                            options: DIT_TAGS,
-                            values: filterTags,
-                            setValues: setFilterTags
-                        })
+                        dataset !== "ftimProjects" && React.createElement(React.Fragment, null,
+                            React.createElement(MultiSelectDropdown, {
+                                label: "Фильтр: Заказчик",
+                                options: CUSTOMERS,
+                                values: filterCustomers,
+                                setValues: setFilterCustomers
+                            }),
+                            React.createElement(MultiSelectDropdown, {
+                                label: "Фильтр: Эффект",
+                                options: EFFECT_OPTIONS,
+                                values: filterEffects,
+                                setValues: setFilterEffects,
+                                defs: EFFECT_DEFINITIONS
+                            }),
+                            React.createElement(MultiSelectDropdown, {
+                                label: "Фильтр: Направление",
+                                options: directionNamesAll,
+                                values: filterDirNames,
+                                setValues: setFilterDirNames
+                            }),
+                            React.createElement(MultiSelectDropdown, {
+                                label: "Фильтр: Теги ДИТ",
+                                options: DIT_TAGS,
+                                values: filterTags,
+                                setValues: setFilterTags
+                            })
+                        )
                     ),
 
                     React.createElement("div", { className: "chips", role: "group", "aria-label": "Переключатели данных и вида" },
@@ -2264,6 +2502,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                             items: [
                                 { value: "directions", label: "Направления" },
                                 { value: "projects", label: "Проекты" },
+                                { value: "ftimProjects", label: "Проекты от ФТИМ" },
                             ]
                         }),
                         React.createElement(ToggleGroup, {
@@ -2322,7 +2561,12 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                             onClick: onOpenCreateDirection,
                             "aria-label": "Создать направление"
                         }, "Создать направление"),
-                        React.createElement("button", {
+                        dataset === "ftimProjects" && React.createElement("button", {
+                            className: "btn primary",
+                            onClick: onOpenAddFTIMProject,
+                            "aria-label": "Добавить проект от ФТИМ"
+                        }, "Добавить"),
+                        dataset !== "ftimProjects" && React.createElement("button", {
                             className: "btn primary",
                             onClick: onOpenAddProject,
                             "aria-label": "Добавить проект"
@@ -2356,24 +2600,27 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                 view === "cards" ? React.createElement("section", { className: "grid cards", role: "list", "aria-label": "Список карточек" },
                     sorted.map((it) => {
                         const isProject = it.type === "project";
+                        const isFTIMProject = it.type === "ftimProject";
                         const dirObj = isProject ? directions.find((d) => d.name === it.directionName) : null;
                         const ideaBadgeVal = isProject ? computeIdeaAdequacy(it, dirObj || undefined) : 0;
+                        
                         return React.createElement("div", {
-                            key: isProject ? "p:" + it.id : "d:" + it.code,
+                            key: isProject ? "p:" + it.id : isFTIMProject ? "f:" + it.id : "d:" + it.code,
                             className: "card",
                             role: "listitem"
                         }, React.createElement("div", { className: "card-head" },
                             React.createElement("div", null,
                                 React.createElement("div", { 
                                     style: { fontWeight: 600, display: "flex", alignItems: "center", gap: 8 } 
-                                }, React.createElement("span", null, isProject ? it.title : it.name),
-                                isProject ? React.createElement(Badge, { kind: "muted" }, "Проект") : null),
+                                }, React.createElement("span", null, isProject ? it.title : isFTIMProject ? it.projectName : it.name),
+                                isProject ? React.createElement(Badge, { kind: "muted" }, "Проект") : 
+                                isFTIMProject ? React.createElement(Badge, { kind: "muted" }, "ФТИМ") : null),
                                 React.createElement("div", { 
                                     className: "small", 
                                     style: { marginTop: 4 } 
                                 }, it.description || "—")
                             ),
-                            React.createElement("div", { className: "chips" },
+                            !isFTIMProject && React.createElement("div", { className: "chips" },
                                 (isProject ? it.customers : it.customersRecommended || []).map((c) =>
                                     React.createElement(Badge, { 
                                         key: c, 
@@ -2382,7 +2629,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                 )
                             )
                         ), React.createElement("div", { className: "card-body" },
-                            React.createElement("div", { className: "chips" },
+                            !isFTIMProject && React.createElement("div", { className: "chips" },
                                 (isProject ? it.effectTags : it.recommendedEffects || []).map((e) =>
                                     React.createElement(Badge, { 
                                         key: e, 
@@ -2415,6 +2662,13 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                         title: "Idea% = 60% качество обоснований + 40% core пилота" 
                                     }, "Idea ", ideaBadgeVal, "%")
                                 )
+                            ) : isFTIMProject ? React.createElement(React.Fragment, null,
+                                React.createElement("div", { className: "small" },
+                                    React.createElement("span", { className: "muted" }, "Направление:"), " ", it.directionName || "—"),
+                                React.createElement("div", { className: "small" },
+                                    React.createElement("span", { className: "muted" }, "Статус:"), " ", it.status || "—"),
+                                it.pilotSite && React.createElement("div", { className: "small" },
+                                    React.createElement("span", { className: "muted" }, "Пилотная площадка:"), " ", it.pilotSite)
                             ) : React.createElement(React.Fragment, null,
                                 (it.openCases || []).length > 0 && React.createElement("div", null,
                                     React.createElement("div", { 
@@ -2441,7 +2695,9 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                             )
                         ), React.createElement("div", { className: "card-foot" },
                             React.createElement("div", { className: "small" }, 
-                                isProject ? "Статус: " + (it.status || "готов") : "Редактируйте данные направления"),
+                                isProject ? "Статус: " + (it.status || "готов") : 
+                                isFTIMProject ? "Текущий статус: " + (it.currentStatus || "—") :
+                                "Редактируйте данные направления"),
                             React.createElement("div", { className: "chips" },
                                 isProject ? React.createElement(React.Fragment, null,
                                     React.createElement("button", {
@@ -2452,6 +2708,17 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                     React.createElement("button", {
                                         className: "btn primary",
                                         onClick: () => onEditProject(it),
+                                        "aria-label": "Редактировать проект"
+                                    }, "Редактировать")
+                                ) : isFTIMProject ? React.createElement(React.Fragment, null,
+                                    React.createElement("button", {
+                                        className: "btn",
+                                        onClick: () => deleteFTIMProject(it.id),
+                                        "aria-label": "Удалить проект"
+                                    }, "Удалить"),
+                                    React.createElement("button", {
+                                        className: "btn primary",
+                                        onClick: () => onEditFTIMProject(it),
                                         "aria-label": "Редактировать проект"
                                     }, "Редактировать")
                                 ) : React.createElement("button", {
@@ -2480,7 +2747,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                 sortDir,
                                                 onSort
                                             })),
-                                        React.createElement("th", null, 
+                                        dataset !== "ftimProjects" && React.createElement("th", null, 
                                             React.createElement(SortHeader, {
                                                 label: "Заказчик",
                                                 sortKey: "customer",
@@ -2488,7 +2755,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                 sortDir,
                                                 onSort
                                             })),
-                                        React.createElement("th", null, 
+                                        dataset !== "ftimProjects" && React.createElement("th", null, 
                                             React.createElement(SortHeader, {
                                                 label: "Эффекты",
                                                 sortKey: "effects",
@@ -2504,7 +2771,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                 sortDir,
                                                 onSort
                                             })),
-                                        React.createElement("th", null, 
+                                        dataset === "projects" && React.createElement("th", null, 
                                             React.createElement(SortHeader, {
                                                 label: "Fit",
                                                 sortKey: "fit",
@@ -2512,7 +2779,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                 sortDir,
                                                 onSort
                                             })),
-                                        React.createElement("th", null, 
+                                        dataset === "projects" && React.createElement("th", null, 
                                             React.createElement(SortHeader, {
                                                 label: "Pilot",
                                                 sortKey: "pilot",
@@ -2526,22 +2793,28 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                 React.createElement("tbody", null,
                                     sorted.map((it) =>
                                         React.createElement("tr", {
-                                            key: it.type === "project" ? "p:" + it.id : "d:" + it.code,
+                                            key: it.type === "project" ? "p:" + it.id : it.type === "ftimProject" ? "f:" + it.id : "d:" + it.code,
                                             className: "table-row"
                                         }, React.createElement("td", null,
                                             React.createElement("div", { 
                                                 style: { fontWeight: 600, display: "flex", alignItems: "center", gap: 6 } 
-                                            }, it.type === "project" ? it.title : it.name,
+                                            }, it.type === "project" ? it.title : 
+                                               it.type === "ftimProject" ? it.projectName : 
+                                               it.name,
                                             it.type === "project" ? 
-                                            React.createElement(Badge, { kind: "muted" }, "Проект") : null),
+                                            React.createElement(Badge, { kind: "muted" }, "Проект") : 
+                                            it.type === "ftimProject" ?
+                                            React.createElement(Badge, { kind: "muted" }, "ФТИМ") : null),
                                             React.createElement("div", { className: "small" }, it.description || "—")
-                                        ), React.createElement("td", null,
+                                        ), 
+                                        dataset !== "ftimProjects" && React.createElement("td", null,
                                             React.createElement("div", { className: "chips" },
                                                 (it.customers || it.customersRecommended || []).map((c) =>
                                                     React.createElement(Badge, { key: c }, c)
                                                 )
                                             )
-                                        ), React.createElement("td", null,
+                                        ),
+                                        dataset !== "ftimProjects" && React.createElement("td", null,
                                             React.createElement("div", { className: "chips" },
                                                 (it.effectTags || it.recommendedEffects || []).map((e) =>
                                                     React.createElement(Badge, { 
@@ -2550,12 +2823,15 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                     }, e)
                                                 )
                                             )
-                                        ), React.createElement("td", null, 
-                                            it.type === "project" ? it.directionName || "—" : it.name),
+                                        ),
                                         React.createElement("td", null, 
+                                            it.type === "project" ? it.directionName || "—" : 
+                                            it.type === "ftimProject" ? it.directionName || "—" :
+                                            it.name),
+                                        dataset === "projects" && React.createElement("td", null, 
                                             it.type === "project" ? 
                                             React.createElement(Badge, null, "Fit ", it.fitScore ?? 0, "%") : "—"),
-                                        React.createElement("td", null, 
+                                        dataset === "projects" && React.createElement("td", null, 
                                             it.type === "project" ? 
                                             React.createElement(Badge, null, "Pilot ", it.pilotReadiness ?? 0, "%") : "—"),
                                         React.createElement("td", null,
@@ -2571,6 +2847,17 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                         onClick: () => onEditProject(it),
                                                         "aria-label": "Редактировать проект"
                                                     }, "Редактировать")
+                                                ) : it.type === "ftimProject" ? React.createElement(React.Fragment, null,
+                                                    React.createElement("button", {
+                                                        className: "btn",
+                                                        onClick: () => deleteFTIMProject(it.id),
+                                                        "aria-label": "Удалить проект"
+                                                    }, "Удалить"),
+                                                    React.createElement("button", {
+                                                        className: "btn primary",
+                                                        onClick: () => onEditFTIMProject(it),
+                                                        "aria-label": "Редактировать проект"
+                                                    }, "Редактировать")
                                                 ) : React.createElement("button", {
                                                     className: "btn primary",
                                                     onClick: () => onEditDirection(it),
@@ -2581,7 +2868,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                     ),
                                     sorted.length === 0 && React.createElement("tr", null,
                                         React.createElement("td", { 
-                                            colSpan: 7, 
+                                            colSpan: dataset === "ftimProjects" ? 4 : dataset === "projects" ? 7 : 5, 
                                             className: "small", 
                                             style: { textAlign: "center", padding: 16 } 
                                         }, "Ничего не найдено")
@@ -2698,6 +2985,14 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     open: dirCreateOpen,
                     onClose: () => setDirCreateOpen(false),
                     onSave: (d) => createDirection(d)
+                }),
+
+                React.createElement(FTIMProjectDrawer, {
+                    open: ftimProjOpen,
+                    onClose: () => setFtimProjOpen(false),
+                    directions,
+                    initialProject: ftimProjEditing,
+                    onSave: (p) => addOrUpdateFTIMProject(p)
                 })
             );
         }
