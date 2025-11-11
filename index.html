@@ -1728,6 +1728,167 @@
             }));
         }
 
+        /* ====================== Direction: создание нового ====================== */
+        function DirectionCreateDrawer({ open, onClose, onSave }) {
+            const [code, setCode] = useState("");
+            const [name, setName] = useState("");
+            const [description, setDescription] = useState("");
+            const [customersRecommended, setCustomersRecommended] = useState([]);
+            const [openCases, setOpenCases] = useState([]);
+            const [recommendedEffects, setRecommendedEffects] = useState([]);
+            const [recommendedTags, setRecommendedTags] = useState([]);
+            const [pilotHints, setPilotHints] = useState([]);
+            const [stakeholders, setStakeholders] = useState([]);
+            const [requirements, setRequirements] = useState([]);
+            const [errors, setErrors] = useState({});
+
+            // Сброс формы при открытии/закрытии
+            useEffect(() => {
+                if (open) {
+                    setCode("");
+                    setName("");
+                    setDescription("");
+                    setCustomersRecommended([]);
+                    setOpenCases([]);
+                    setRecommendedEffects([]);
+                    setRecommendedTags([]);
+                    setPilotHints([]);
+                    setStakeholders([]);
+                    setRequirements([]);
+                    setErrors({});
+                }
+            }, [open]);
+
+            const validate = () => {
+                const e = {};
+                if (!code.trim()) e.code = "Введите код направления";
+                if (!name.trim()) e.name = "Введите название направления";
+                if (!description.trim()) e.description = "Введите описание направления";
+                setErrors(e);
+                return Object.keys(e).length === 0;
+            };
+
+            const save = () => {
+                if (!validate()) return;
+                
+                const newDirection = {
+                    code: code.trim(),
+                    name: name.trim(),
+                    description: description.trim(),
+                    customersRecommended,
+                    openCases,
+                    recommendedEffects,
+                    recommendedTags,
+                    pilotHints,
+                    stakeholders,
+                    requirements,
+                };
+                onSave(newDirection);
+                onClose();
+            };
+
+            return React.createElement(SideModal, {
+                open,
+                onClose,
+                title: "Создать новое направление",
+                "aria-label": "Создать новое направление",
+                footRight: React.createElement(React.Fragment, null,
+                    React.createElement("button", { className: "btn", onClick: onClose }, "Отмена"),
+                    React.createElement("button", { className: "btn primary", onClick: save }, "Создать направление")
+                )
+            }, React.createElement("div", { className: "row cols-2" },
+                React.createElement("div", null,
+                    React.createElement("div", { className: "label" }, "• Код направления"),
+                    React.createElement("input", {
+                        className: "input",
+                        value: code,
+                        onChange: (e) => setCode(e.target.value),
+                        placeholder: "Например: 9.0",
+                        "aria-invalid": !!errors.code,
+                        "aria-describedby": errors.code ? "err-code" : undefined
+                    }),
+                    errors.code && React.createElement("div", { 
+                        id: "err-code", 
+                        className: "small", 
+                        style: { color: "var(--red)" } 
+                    }, errors.code)
+                ),
+                React.createElement("div", null,
+                    React.createElement("div", { className: "label" }, "• Название направления"),
+                    React.createElement("input", {
+                        className: "input",
+                        value: name,
+                        onChange: (e) => setName(e.target.value),
+                        placeholder: "Краткое название",
+                        "aria-invalid": !!errors.name,
+                        "aria-describedby": errors.name ? "err-name" : undefined
+                    }),
+                    errors.name && React.createElement("div", { 
+                        id: "err-name", 
+                        className: "small", 
+                        style: { color: "var(--red)" } 
+                    }, errors.name)
+                )
+            ), React.createElement("div", null,
+                React.createElement("div", { className: "label" }, "• Описание направления"),
+                React.createElement("textarea", {
+                    className: "input textarea",
+                    value: description,
+                    onChange: (e) => setDescription(e.target.value),
+                    placeholder: "Подробное описание направления...",
+                    "aria-invalid": !!errors.description,
+                    "aria-describedby": errors.description ? "err-desc" : undefined
+                }),
+                errors.description && React.createElement("div", { 
+                    id: "err-desc", 
+                    className: "small", 
+                    style: { color: "var(--red)" } 
+                }, errors.description)
+            ), React.createElement(CheckboxList, {
+                label: "Рекомендуемые заказчики",
+                items: CUSTOMERS,
+                values: customersRecommended,
+                setValues: setCustomersRecommended
+            }), React.createElement(MultiSelectDropdown, {
+                label: "Рекомендуемые эффекты",
+                options: EFFECT_OPTIONS,
+                values: recommendedEffects,
+                setValues: setRecommendedEffects,
+                defs: EFFECT_DEFINITIONS
+            }), React.createElement(MultiSelectDropdown, {
+                label: "Рекомендуемые теги ДИТ",
+                options: DIT_TAGS,
+                values: recommendedTags,
+                setValues: setRecommendedTags
+            }), React.createElement(TagsInput, {
+                label: "Открытые кейсы",
+                values: openCases,
+                setValues: setOpenCases,
+                placeholder: "Добавьте кейс и нажмите Enter",
+                ariaLabel: "Открытые кейсы"
+            }), React.createElement(TagsInput, {
+                label: "Подсказки для пилота",
+                values: pilotHints,
+                setValues: setPilotHints,
+                placeholder: "Добавьте подсказку и нажмите Enter",
+                ariaLabel: "Подсказки для пилота"
+            }), React.createElement(TagsInput, {
+                label: "Стейкхолдеры (опционально)",
+                values: stakeholders,
+                setValues: setStakeholders,
+                placeholder: "Добавьте стейкхолдера и нажмите Enter",
+                ariaLabel: "Стейкхолдеры"
+            }), React.createElement(TagsInput, {
+                label: "Требования для самооценки",
+                values: requirements,
+                setValues: setRequirements,
+                placeholder: "Добавьте требование и нажмите Enter",
+                ariaLabel: "Требования для самооценки"
+            }), React.createElement("div", { className: "small", style: { color: "var(--muted)" } },
+                "Новое направление будет доступно для выбора в проектах и появится в общем списке направлений."
+            ));
+        }
+
         /* ====================== Главный компонент ====================== */
         function DirectionsDashboardFixed() {
             const [directions, setDirections] = useState(loadDirections());
@@ -1753,6 +1914,8 @@
 
             const [dirOpen, setDirOpen] = useState(false);
             const [dirEditing, setDirEditing] = useState(null);
+
+            const [dirCreateOpen, setDirCreateOpen] = useState(false);
 
             const directionNamesAll = useMemo(() => directions.map((d) => d.name), [directions]);
 
@@ -1854,6 +2017,9 @@
                 setDirEditing(d);
                 setDirOpen(true);
             };
+            const onOpenCreateDirection = () => {
+                setDirCreateOpen(true);
+            };
 
             const addOrUpdateProject = (project) => {
                 setProjects((prev) => {
@@ -1871,6 +2037,22 @@
                     saveDirections(next);
                     return next;
                 });
+            };
+
+            const createDirection = (newDirection) => {
+                // Проверяем, нет ли направления с таким же кодом
+                const exists = directions.find(d => d.code === newDirection.code);
+                if (exists) {
+                    alert('Направление с таким кодом уже существует!');
+                    return;
+                }
+                
+                setDirections((prev) => {
+                    const next = [...prev, newDirection];
+                    saveDirections(next);
+                    return next;
+                });
+                setDirCreateOpen(false);
             };
 
             const exportJSON = () => {
@@ -2020,7 +2202,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
 
             return React.createElement("div", { className: "app-shell" },
                 React.createElement("header", { className: "header" },
-                    React.createElement("div", { className: "title" }, "Карта направлений — дашборд (исправлено)"),
+                    React.createElement("div", { className: "title" }, "Карта направлений — дашборд"),
                     React.createElement("div", { className: "spacer" }),
                     React.createElement("div", { className: "status" },
                         React.createElement("span", { 
@@ -2135,6 +2317,11 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                 e.currentTarget.value = "";
                             }
                         })),
+                        dataset === "directions" && React.createElement("button", {
+                            className: "btn primary",
+                            onClick: onOpenCreateDirection,
+                            "aria-label": "Создать направление"
+                        }, "Создать направление"),
                         React.createElement("button", {
                             className: "btn primary",
                             onClick: onOpenAddProject,
@@ -2505,6 +2692,12 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     onClose: () => setDirOpen(false),
                     initialDirection: dirEditing,
                     onSave: (d) => saveDirection(d)
+                }),
+
+                React.createElement(DirectionCreateDrawer, {
+                    open: dirCreateOpen,
+                    onClose: () => setDirCreateOpen(false),
+                    onSave: (d) => createDirection(d)
                 })
             );
         }
