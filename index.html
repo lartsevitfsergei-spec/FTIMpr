@@ -8,7 +8,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        /* ====================== СТИЛИ (ПОЛНАЯ КОПИЯ) ====================== */
+        /* ====================== СТИЛИ (ПОЛНАЯ КОПИЯ + ДОБАВЛЕНИЯ) ====================== */
         :root {
           --bg: #f8fafc;
           --panel: #ffffff;
@@ -50,7 +50,7 @@
           border: 1px solid var(--border);
           background: #ffffff;
           color: var(--text);
-          borderRadius: 10px;
+          border-radius: 10px;
           padding: 8px 10px;
           font-size: 13px;
         }
@@ -131,6 +131,72 @@
         .softq { display: grid; gap: 8px; }
         .softq-item { display: grid; gap: 4px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
         .softq-item.low { border-color: #fde68a; background: #fffbeb; }
+        
+        /* НОВЫЕ СТИЛИ ДЛЯ СИСТЕМЫ САМООЦЕНКИ */
+        .assessment-steps { display: flex; gap: 8px; margin-bottom: 16px; }
+        .assessment-step { 
+            flex: 1; 
+            text-align: center; 
+            padding: 8px; 
+            border-radius: 8px; 
+            background: #f1f5f9; 
+            border: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .assessment-step.active { 
+            background: var(--accent); 
+            color: white; 
+            border-color: var(--accent);
+        }
+        .assessment-step.completed { 
+            background: #dcfce7; 
+            color: var(--green); 
+            border-color: #bbf7d0;
+        }
+        .assessment-step.disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed;
+        }
+        .assessment-block { 
+            border: 1px solid var(--border); 
+            border-radius: 8px; 
+            padding: 16px; 
+            margin-bottom: 16px;
+            background: #fafafa;
+        }
+        .assessment-block.completed { 
+            border-color: var(--green); 
+            background: #f0fdf4;
+        }
+        .assessment-progress { 
+            height: 6px; 
+            background: #e2e8f0; 
+            border-radius: 3px; 
+            margin-bottom: 16px; 
+            overflow: hidden;
+        }
+        .assessment-progress-bar { 
+            height: 100%; 
+            background: var(--accent); 
+            transition: width 0.3s ease;
+        }
+        .business-model-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .business-model-option { 
+            border: 1px solid var(--border); 
+            border-radius: 8px; 
+            padding: 12px; 
+            text-align: center; 
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .business-model-option.selected { 
+            border-color: var(--accent); 
+            background: rgba(37, 99, 235, 0.05);
+        }
+        .field-group { margin-bottom: 16px; }
+        .field-group .label { display: flex; align-items: center; gap: 6px; }
+        .required::after { content: "•"; color: var(--red); margin-left: 4px; }
     </style>
 </head>
 <body>
@@ -148,6 +214,9 @@
 
         /* ====================== Константы и справочники ====================== */
         const CUSTOMERS = ["Метро", "МГТ"];
+        
+        // Новые константы для бизнес-модели
+        const BUSINESS_MODELS = ["Коммерциализация", "Оптимизация"];
 
         const EFFECT_OPTIONS = [
             "Клиентский опыт",
@@ -541,6 +610,50 @@
             return Math.round(raw);
         }
 
+        // НОВАЯ ФУНКЦИЯ: Расчет прогресса по уровням самооценки
+        function computeAssessmentProgress(project) {
+            const baseFields = [
+                project.title?.trim(),
+                project.teamName?.trim(),
+                project.shortDescription?.trim()
+            ];
+            const baseCompleted = baseFields.filter(f => f && f.length > 0).length;
+            const baseProgress = Math.round((baseCompleted / baseFields.length) * 100);
+            
+            const usefulnessFields = [
+                project.directionName,
+                project.customer
+            ];
+            const usefulnessCompleted = usefulnessFields.filter(f => f && f.length > 0).length;
+            const usefulnessProgress = Math.round((usefulnessCompleted / usefulnessFields.length) * 100);
+            
+            const ideaFields = [
+                project.targetAudience?.length > 0,
+                project.problemStatement?.trim(),
+                project.businessModel?.trim(),
+                project.businessModelDescription?.trim(),
+                project.productDescription?.trim()
+            ];
+            const ideaCompleted = ideaFields.filter(Boolean).length;
+            const ideaProgress = Math.round((ideaCompleted / ideaFields.length) * 100);
+            
+            const pilotFields = [
+                project.pilot?.site?.trim(),
+                project.pilot?.stepsPlan?.trim(),
+                project.pilot?.resources?.trim()
+            ];
+            const pilotCompleted = pilotFields.filter(f => f && f.length > 0).length;
+            const pilotProgress = Math.round((pilotCompleted / pilotFields.length) * 100);
+            
+            return {
+                base: baseProgress,
+                usefulness: usefulnessProgress,
+                idea: ideaProgress,
+                pilot: pilotProgress,
+                overall: Math.round((baseProgress + usefulnessProgress + ideaProgress + pilotProgress) / 4)
+            };
+        }
+
         function timeStamp() {
             const d = new Date();
             const pad = (n) => String(n).padStart(2, "0");
@@ -591,6 +704,8 @@
                 stepsPlan: p?.pilot?.stepsPlan || "",
                 successCriteria: p?.pilot?.successCriteria || "",
             };
+            
+            // Новые поля для расширенной самооценки
             const projBase = {
                 id,
                 title: p.title || "",
@@ -603,6 +718,11 @@
                 effectTags: Array.isArray(p.effectTags) ? p.effectTags : [],
                 DITTags: Array.isArray(p.DITTags) ? p.DITTags : [],
                 shortDescription: p.shortDescription || "",
+                // Новые поля для расширенной самооценки
+                problemStatement: p.problemStatement || "",
+                businessModel: p.businessModel || "",
+                businessModelDescription: p.businessModelDescription || "",
+                productDescription: p.productDescription || "",
                 pilot,
                 selfAssessment: Array.isArray(p.selfAssessment) ? p.selfAssessment : [],
                 selfAssessmentNotes: Array.isArray(p.selfAssessmentNotes) ? p.selfAssessmentNotes : [],
@@ -933,11 +1053,14 @@
             return Array.from(sugg);
         }
 
-        /* ====================== Project: форма ====================== */
+        /* ====================== Project: форма с новой системой самооценки ====================== */
         function ProjectDrawer({ open, onClose, directions, initialProject, onSaveFinal, onSaveDraft }) {
             const isEdit = !!(initialProject && initialProject.id);
 
-            // Fields
+            // Состояние для шагов самооценки
+            const [currentStep, setCurrentStep] = useState(1);
+
+            // Fields - существующие
             const [title, setTitle] = useState("");
             const [teamName, setTeamName] = useState("");
             const [teamMembers, setTeamMembers] = useState([]);
@@ -948,6 +1071,12 @@
             const [effectTags, setEffectTags] = useState([]);
             const [DITTags, setDITTags] = useState([]);
             const [shortDescription, setShortDescription] = useState("");
+
+            // Новые поля для расширенной самооценки
+            const [problemStatement, setProblemStatement] = useState("");
+            const [businessModel, setBusinessModel] = useState("");
+            const [businessModelDescription, setBusinessModelDescription] = useState("");
+            const [productDescription, setProductDescription] = useState("");
 
             const [pilotSite, setPilotSite] = useState("");
             const [pilotDataSources, setPilotDataSources] = useState([]);
@@ -961,15 +1090,28 @@
             const [selfNotes, setSelfNotes] = useState([]);
             const [errors, setErrors] = useState({});
 
-            // Мягкие вопросы (UI-ONLY, не меняют Project)
-            const SOFT_QUESTIONS = [
-                "Ясность проблемы и ЦА (насколько чётко сформулировано?)",
-                "Измеримость эффекта (есть ли метрики успеха?)",
-                "Доступ к данным и интеграциям (насколько реалистично?)",
-                "Риски пилота и меры реагирования (оценены ли?)",
-                "Вовлечённость стейкхолдеров (договорённости/интерес?)",
-            ];
-            const [softScores, setSoftScores] = useState([3, 3, 3, 3, 3]);
+            // Расчет прогресса
+            const assessmentProgress = useMemo(() => {
+                return computeAssessmentProgress({
+                    title,
+                    teamName,
+                    shortDescription,
+                    directionName,
+                    customer,
+                    targetAudience,
+                    problemStatement,
+                    businessModel,
+                    businessModelDescription,
+                    productDescription,
+                    pilot: {
+                        site: pilotSite,
+                        resources: pilotResources,
+                        stepsPlan: pilotSteps
+                    }
+                });
+            }, [title, teamName, shortDescription, directionName, customer, targetAudience, 
+                problemStatement, businessModel, businessModelDescription, productDescription,
+                pilotSite, pilotResources, pilotSteps]);
 
             const dirObj = useMemo(() => directions.find((d) => d.name === directionName), [directions, directionName]);
             const reqs = (dirObj?.requirements ?? []);
@@ -988,6 +1130,13 @@
                     setEffectTags(initialProject.effectTags || []);
                     setDITTags(initialProject.DITTags || []);
                     setShortDescription(initialProject.shortDescription || "");
+                    
+                    // Новые поля
+                    setProblemStatement(initialProject.problemStatement || "");
+                    setBusinessModel(initialProject.businessModel || "");
+                    setBusinessModelDescription(initialProject.businessModelDescription || "");
+                    setProductDescription(initialProject.productDescription || "");
+                    
                     const p = initialProject.pilot || {};
                     setPilotSite(p.site || "");
                     setPilotDataSources(p.dataSources || []);
@@ -1018,6 +1167,13 @@
                     setEffectTags([]);
                     setDITTags([]);
                     setShortDescription("");
+                    
+                    // Новые поля
+                    setProblemStatement("");
+                    setBusinessModel("");
+                    setBusinessModelDescription("");
+                    setProductDescription("");
+                    
                     setPilotSite("");
                     setPilotDataSources([]);
                     setPilotIntegrations([]);
@@ -1027,7 +1183,7 @@
                     setPilotSuccess("");
                     setSelfChecks([]);
                     setSelfNotes([]);
-                    setSoftScores([3, 3, 3, 3, 3]);
+                    setCurrentStep(1);
                 }
                 setErrors({});
             }, [open, isEdit, initialProject, directions]);
@@ -1054,6 +1210,10 @@
                     effectTags,
                     DITTags,
                     shortDescription,
+                    problemStatement,
+                    businessModel,
+                    businessModelDescription,
+                    productDescription,
                     pilot: {
                         site: pilotSite,
                         dataSources: pilotDataSources,
@@ -1078,6 +1238,10 @@
                 effectTags,
                 DITTags,
                 shortDescription,
+                problemStatement,
+                businessModel,
+                businessModelDescription,
+                productDescription,
                 pilotSite,
                 pilotDataSources,
                 pilotIntegrations,
@@ -1143,6 +1307,11 @@
                     effectTags,
                     DITTags,
                     shortDescription,
+                    // Новые поля
+                    problemStatement,
+                    businessModel,
+                    businessModelDescription,
+                    productDescription,
                     pilot: {
                         site: pilotSite,
                         dataSources: pilotDataSources,
@@ -1190,6 +1359,315 @@
             const dsPresets = computePresetDataSources(effectTags, directionName).filter((x) => !pilotDataSources.includes(x));
             const intPresets = computePresetIntegrations(effectTags, directionName).filter((x) => !pilotIntegrations.includes(x));
 
+            // Рендер шагов самооценки
+            const renderStep = (step) => {
+                switch(step) {
+                    case 1:
+                        return React.createElement("div", { className: "assessment-block" + (assessmentProgress.base === 100 ? " completed" : "") },
+                            React.createElement("h3", { style: { marginTop: 0 } }, "1. Базовая информация"),
+                            React.createElement("div", { className: "small", style: { marginBottom: 16 } }, 
+                                "Заполните основные сведения о проекте. Без этой информации нельзя перейти к следующим шагам."),
+                            
+                            React.createElement("div", { className: "row cols-2" },
+                                React.createElement("div", { className: "field-group" },
+                                    React.createElement("div", { className: "label required" }, "Название идеи"),
+                                    React.createElement("input", {
+                                        className: "input",
+                                        value: title,
+                                        onChange: (e) => setTitle(e.target.value),
+                                        placeholder: "Краткое и понятное название проекта"
+                                    })
+                                ),
+                                React.createElement("div", { className: "field-group" },
+                                    React.createElement("div", { className: "label required" }, "Название команды"),
+                                    React.createElement("input", {
+                                        className: "input",
+                                        value: teamName,
+                                        onChange: (e) => setTeamName(e.target.value),
+                                        placeholder: "Команда разработки"
+                                    })
+                                )
+                            ),
+                            
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label required" }, "Описание проекта"),
+                                React.createElement("textarea", {
+                                    className: "input textarea",
+                                    value: shortDescription,
+                                    onChange: (e) => setShortDescription(e.target.value),
+                                    placeholder: "Опишите суть проекта, основную идею и ценность"
+                                })
+                            ),
+                            
+                            React.createElement(TagsInput, {
+                                label: "Команда — ФИО участников",
+                                values: teamMembers,
+                                setValues: setTeamMembers,
+                                placeholder: "Добавьте ФИО и нажмите Enter",
+                                ariaLabel: "Команда — ФИО участников"
+                            })
+                        );
+                    
+                    case 2:
+                        return React.createElement("div", { className: "assessment-block" + (assessmentProgress.usefulness === 100 ? " completed" : "") },
+                            React.createElement("h3", { style: { marginTop: 0 } }, "2. Оценка полезности"),
+                            React.createElement("div", { className: "small", style: { marginBottom: 16 } }, 
+                                "Определите направление и заказчика для оценки релевантности проекта."),
+                            
+                            React.createElement("div", { className: "row cols-2" },
+                                React.createElement("div", { className: "field-group" },
+                                    React.createElement("div", { className: "label required" }, "Направление"),
+                                    React.createElement("select", {
+                                        className: "select",
+                                        value: directionName,
+                                        onChange: (e) => onDirectionChange(e.target.value)
+                                    }, React.createElement("option", { value: "" }, "Выберите направление"),
+                                    directions.map((d) =>
+                                        React.createElement("option", { key: d.code, value: d.name }, d.name)
+                                    ))
+                                ),
+                                React.createElement("div", { className: "field-group" },
+                                    React.createElement("div", { className: "label required" }, "Заказчик"),
+                                    React.createElement("select", {
+                                        className: "select",
+                                        value: customer,
+                                        onChange: (e) => setCustomer(e.target.value)
+                                    }, React.createElement("option", { value: "" }, "Выберите заказчика"),
+                                    CUSTOMERS.map((c) =>
+                                        React.createElement("option", { key: c, value: c }, c)
+                                    ))
+                                )
+                            ),
+                            
+                            // Контекст направления
+                            dirObj && React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Контекст выбранного направления"),
+                                React.createElement("div", { className: "card" },
+                                    React.createElement("div", { className: "card-body" },
+                                        React.createElement("div", { className: "small" }, dirObj.description),
+                                        (dirObj.openCases || []).length > 0 && React.createElement("div", null,
+                                            React.createElement("div", { 
+                                                className: "small", 
+                                                style: { marginBottom: 4, fontWeight: 600 } 
+                                            }, "Открытые кейсы:"),
+                                            React.createElement("ul", { className: "list" },
+                                                (dirObj.openCases || []).map((c, i) =>
+                                                    React.createElement("li", { key: i, className: "small" }, c)
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        );
+                    
+                    case 3:
+                        return React.createElement("div", { className: "assessment-block" + (assessmentProgress.idea >= 60 ? " completed" : "") },
+                            React.createElement("h3", { style: { marginTop: 0 } }, "3. Самооценка идеи"),
+                            React.createElement("div", { className: "small", style: { marginBottom: 16 } }, 
+                                "Детально проработайте концепцию проекта."),
+                            
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Целевая аудитория"),
+                                React.createElement(TagsInput, {
+                                    values: targetAudience,
+                                    setValues: setTargetAudience,
+                                    placeholder: "Добавьте целевую аудиторию и нажмите Enter",
+                                    ariaLabel: "Целевая аудитория"
+                                })
+                            ),
+                            
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Проблематика"),
+                                React.createElement("textarea", {
+                                    className: "input textarea",
+                                    value: problemStatement,
+                                    onChange: (e) => setProblemStatement(e.target.value),
+                                    placeholder: "Опишите проблему, которую решает ваш проект"
+                                })
+                            ),
+                            
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Бизнес-модель"),
+                                React.createElement("div", { className: "business-model-options" },
+                                    BUSINESS_MODELS.map((model) =>
+                                        React.createElement("div", {
+                                            key: model,
+                                            className: "business-model-option" + (businessModel === model ? " selected" : ""),
+                                            onClick: () => setBusinessModel(model)
+                                        }, model)
+                                    )
+                                ),
+                                businessModel && React.createElement("textarea", {
+                                    className: "input textarea",
+                                    value: businessModelDescription,
+                                    onChange: (e) => setBusinessModelDescription(e.target.value),
+                                    placeholder: "Опишите, как именно работает выбранная бизнес-модель",
+                                    style: { marginTop: 8 }
+                                })
+                            ),
+                            
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Описание продукта"),
+                                React.createElement("textarea", {
+                                    className: "input textarea",
+                                    value: productDescription,
+                                    onChange: (e) => setProductDescription(e.target.value),
+                                    placeholder: "Детально опишите, что представляет собой ваш продукт/решение"
+                                })
+                            ),
+                            
+                            // Существующие требования направления
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Требования направления"),
+                                reqs.length === 0 ? React.createElement("div", { className: "small" }, "Выберите направление — чек-лист появится автоматически.") :
+                                React.createElement("div", null,
+                                    React.createElement("div", { className: "sa-meta" },
+                                        React.createElement("span", { className: "small" }, "Отметьте все пункты и заполните обоснования."),
+                                        React.createElement(Badge, { 
+                                            kind: reqs.length > 0 && selfChecks.filter(Boolean).length === reqs.length ? "ok" : "muted" 
+                                        }, "Отмечено ", selfChecks.filter(Boolean).length, "/", reqs.length),
+                                        React.createElement(Badge, { 
+                                            kind: notesOkFlags.every(Boolean) ? "ok" : "muted" 
+                                        }, "Обоснования ", notesOkFlags.filter(Boolean).length, "/", reqs.length)
+                                    ),
+                                    React.createElement("ul", { className: "sa-list" }, reqs.map((req, idx) => {
+                                        const checked = !!selfChecks[idx];
+                                        const note = selfNotes[idx] || "";
+                                        const noteOk = note.trim().length >= MIN_NOTE_CHARS && !isTrivialNote(note);
+                                        const missing = !checked || !noteOk;
+                                        const example = REQ_EXAMPLES[req] || DEFAULT_REQ_EXAMPLE;
+                                        return React.createElement("li", {
+                                            key: idx,
+                                            className: "sa-item " + (missing ? "missing" : ""),
+                                            title: "Отметьте и добавьте короткое обоснование"
+                                        }, React.createElement("input", {
+                                            type: "checkbox",
+                                            checked,
+                                            onChange: (e) => {
+                                                const arr = selfChecks.slice();
+                                                arr[idx] = e.target.checked;
+                                                setSelfChecks(arr);
+                                            },
+                                            "aria-label": `Подтвердить: ${req}`
+                                        }), React.createElement("div", null,
+                                            React.createElement("div", { 
+                                                className: "small", 
+                                                style: { color: "inherit", marginBottom: 6 } 
+                                            }, req),
+                                            React.createElement("input", {
+                                                className: "input note-input",
+                                                value: note,
+                                                onChange: (e) => {
+                                                    const arr = selfNotes.slice();
+                                                    arr[idx] = e.target.value;
+                                                    setSelfNotes(arr);
+                                                },
+                                                placeholder: "Коротко опишите, как выполняется требование",
+                                                "aria-label": `Обоснование: ${req}`,
+                                                "aria-invalid": !noteOk
+                                            }),
+                                            React.createElement("div", { 
+                                                className: "small", 
+                                                style: { marginTop: 4 } 
+                                            }, "Коротко: как именно решение выполняет требование (1–2 предложения)."),
+                                            React.createElement("div", { 
+                                                className: "small", 
+                                                style: { marginTop: 2, color: "#334155" } 
+                                            }, example)
+                                        ));
+                                    }))
+                                )
+                            )
+                        );
+                    
+                    case 4:
+                        return React.createElement("div", { className: "assessment-block" + (assessmentProgress.pilot >= 60 ? " completed" : "") },
+                            React.createElement("h3", { style: { marginTop: 0 } }, "4. Проработанность пилотирования"),
+                            React.createElement("div", { className: "small", style: { marginBottom: 16 } }, 
+                                "Запланируйте проведение пилотного тестирования."),
+                            
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Где планируется пилотировать"),
+                                React.createElement("input", {
+                                    className: "input",
+                                    value: pilotSite,
+                                    onChange: (e) => setPilotSite(e.target.value),
+                                    placeholder: "Конкретная площадка, маршрут, станция и т.д."
+                                })
+                            ),
+                            
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Как планируется пилотировать"),
+                                React.createElement("textarea", {
+                                    className: "input textarea",
+                                    value: pilotSteps,
+                                    onChange: (e) => setPilotSteps(e.target.value),
+                                    placeholder: "Пошаговый план проведения пилота"
+                                })
+                            ),
+                            
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "За сколько (ресурсы и сроки)"),
+                                React.createElement("textarea", {
+                                    className: "input textarea",
+                                    value: pilotResources,
+                                    onChange: (e) => setPilotResources(e.target.value),
+                                    placeholder: "Необходимые ресурсы, бюджет, сроки реализации"
+                                })
+                            ),
+                            
+                            // Остальные поля пилота (существующие)
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Источники данных"),
+                                React.createElement(TagsInput, {
+                                    values: pilotDataSources,
+                                    setValues: setPilotDataSources,
+                                    placeholder: "Добавьте источники данных и нажмите Enter",
+                                    ariaLabel: "Источники данных"
+                                })
+                            ),
+                            
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Точки подключения"),
+                                React.createElement(TagsInput, {
+                                    values: pilotIntegrations,
+                                    setValues: setPilotIntegrations,
+                                    placeholder: "Добавьте системы/API и нажмите Enter",
+                                    ariaLabel: "Точки подключения"
+                                })
+                            ),
+                            
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Критерии успеха"),
+                                React.createElement("textarea", {
+                                    className: "input textarea",
+                                    value: pilotSuccess,
+                                    onChange: (e) => setPilotSuccess(e.target.value),
+                                    placeholder: "Метрики и критерии успешного пилота"
+                                })
+                            )
+                        );
+                    
+                    default:
+                        return null;
+                }
+            };
+
+            // Проверка возможности перехода к следующему шагу
+            const canProceedToStep = (step) => {
+                switch(step) {
+                    case 2: // К оценке полезности
+                        return title.trim() && teamName.trim() && shortDescription.trim();
+                    case 3: // К самооценке идеи  
+                        return directionName && customer;
+                    case 4: // К пилотированию
+                        return true; // Всегда можно перейти к пилотированию
+                    default:
+                        return true;
+                }
+            };
+
             return React.createElement(SideModal, {
                 open,
                 onClose,
@@ -1207,8 +1685,8 @@
                     }, "Idea ", computed.idea, "%")
                 ),
                 footLeft: React.createElement("div", { className: "small" },
-                    "Черновик можно сохранить без прохождения самооценки и порогов",
-                    nextStepsUnique.length > 0 ? ":" : "",
+                    "Прогресс самооценки: ", assessmentProgress.overall, "%",
+                    nextStepsUnique.length > 0 ? " • Рекомендации:" : "",
                     nextStepsUnique.length > 0 && React.createElement("ul", { 
                         className: "list", 
                         style: { marginTop: 4 } 
@@ -1217,415 +1695,64 @@
                     ))
                 ),
                 footRight: React.createElement(React.Fragment, null,
-                    React.createElement("button", {
+                    currentStep > 1 && React.createElement("button", {
                         className: "btn",
-                        onClick: () => submit("черновик")
-                    }, "Сохранить как черновик"),
-                    React.createElement("button", {
+                        onClick: () => setCurrentStep(currentStep - 1)
+                    }, "Назад"),
+                    currentStep < 4 && React.createElement("button", {
                         className: "btn primary",
-                        onClick: () => submit("готов"),
-                        disabled: !canSave,
-                        "aria-disabled": !canSave
-                    }, "Сохранить")
+                        onClick: () => setCurrentStep(currentStep + 1),
+                        disabled: !canProceedToStep(currentStep + 1)
+                    }, "Далее"),
+                    currentStep === 4 && React.createElement(React.Fragment, null,
+                        React.createElement("button", {
+                            className: "btn",
+                            onClick: () => submit("черновик")
+                        }, "Сохранить как черновик"),
+                        React.createElement("button", {
+                            className: "btn primary",
+                            onClick: () => submit("готов"),
+                            disabled: !canSave,
+                            "aria-disabled": !canSave
+                        }, "Сохранить")
+                    )
                 )
-            }, React.createElement("div", { className: "row cols-2" },
-                React.createElement("div", null,
-                    React.createElement("div", { className: "label" }, "• Название проекта"),
-                    React.createElement("input", {
-                        className: "input",
-                        value: title,
-                        onChange: (e) => setTitle(e.target.value),
-                        "aria-invalid": !!errors.title,
-                        "aria-describedby": errors.title ? "err-title" : undefined,
-                        placeholder: "Кратко суть решения"
-                    }),
-                    errors.title && React.createElement("div", { 
-                        id: "err-title", 
-                        className: "small", 
-                        style: { color: "var(--red)" } 
-                    }, errors.title)
-                ),
-                React.createElement("div", null,
-                    React.createElement("div", { className: "label" }, "• Название команды"),
-                    React.createElement("input", {
-                        className: "input",
-                        value: teamName,
-                        onChange: (e) => setTeamName(e.target.value),
-                        "aria-invalid": !!errors.teamName,
-                        "aria-describedby": errors.teamName ? "err-team" : undefined,
-                        placeholder: "Команда..."
-                    }),
-                    errors.teamName && React.createElement("div", { 
-                        id: "err-team", 
-                        className: "small", 
-                        style: { color: "var(--red)" } 
-                    }, errors.teamName)
-                )
-            ),
-
-            React.createElement(TagsInput, {
-                label: "Команда — ФИО участников",
-                values: teamMembers,
-                setValues: setTeamMembers,
-                placeholder: "Добавьте ФИО и нажмите Enter",
-                ariaLabel: "Команда — ФИО участников"
-            }),
-
-            React.createElement("div", { className: "row cols-2" },
-                React.createElement("div", null,
-                    React.createElement("div", { className: "label" }, "• Заказчик"),
-                    React.createElement("select", {
-                        className: "select",
-                        value: customer,
-                        onChange: (e) => setCustomer(e.target.value),
-                        "aria-invalid": !!errors.customer,
-                        "aria-describedby": errors.customer ? "err-cust" : undefined
-                    }, React.createElement("option", { value: "" }, "Выберите заказчика"),
-                    CUSTOMERS.map((c) =>
-                        React.createElement("option", { key: c, value: c }, c)
-                    )),
-                    errors.customer && React.createElement("div", { 
-                        id: "err-cust", 
-                        className: "small", 
-                        style: { color: "var(--red)" } 
-                    }, errors.customer)
-                ),
-                React.createElement("div", null,
-                    React.createElement("div", { className: "label" }, "• Направление"),
-                    React.createElement("select", {
-                        className: "select",
-                        value: directionName,
-                        onChange: (e) => onDirectionChange(e.target.value),
-                        "aria-invalid": !!errors.directionName,
-                        "aria-describedby": errors.directionName ? "err-dir" : undefined
-                    }, React.createElement("option", { value: "" }, "Выберите направление"),
-                    directions.map((d) =>
-                        React.createElement("option", { key: d.code, value: d.name }, d.name)
-                    )),
-                    errors.directionName && React.createElement("div", { 
-                        id: "err-dir", 
-                        className: "small", 
-                        style: { color: "var(--red)" } 
-                    }, errors.directionName)
-                )
-            ),
-
-            React.createElement(TagsInput, {
-                label: "Целевая аудитория",
-                values: targetAudience,
-                setValues: setTargetAudience,
-                placeholder: "Добавьте аудитории и нажмите Enter",
-                ariaLabel: "Целевая аудитория"
-            }),
-
-            React.createElement(MultiSelectDropdown, {
-                label: "Эффекты (выберите)",
-                options: EFFECT_OPTIONS,
-                values: effectTags,
-                setValues: setEffectTags,
-                defs: EFFECT_DEFINITIONS
-            }),
-            effSugg.length > 0 && React.createElement("div", { 
-                className: "small", 
-                style: { marginTop: -6 } 
-            }, "Предложить эффекты: ", React.createElement("span", { className: "chips" },
-                effSugg.map((s) =>
-                    React.createElement(Chip, { 
-                        key: s, 
-                        onClick: () => setEffectTags([...effectTags, s]) 
-                    }, s, " +")
-                )
-            )),
-
-            React.createElement(MultiSelectDropdown, {
-                label: "Теги ДИТ (опционально)",
-                options: DIT_TAGS,
-                values: DITTags,
-                setValues: setDITTags
-            }),
-            ditSugg.length > 0 && React.createElement("div", { 
-                className: "small", 
-                style: { marginTop: -6 } 
-            }, "Предложить теги: ", React.createElement("span", { className: "chips" },
-                ditSugg.map((s) =>
-                    React.createElement(Chip, { 
-                        key: s, 
-                        onClick: () => setDITTags([...DITTags, s]) 
-                    }, s, " +")
-                )
-            )),
-
-            React.createElement("div", null,
-                React.createElement("div", { className: "label" }, "Краткое описание (опционально)"),
-                React.createElement("textarea", {
-                    className: "input textarea",
-                    value: shortDescription,
-                    onChange: (e) => setShortDescription(e.target.value),
-                    placeholder: "Опишите решение и ожидаемый эффект"
+            }, 
+            // Прогресс-бар
+            React.createElement("div", { className: "assessment-progress" },
+                React.createElement("div", { 
+                    className: "assessment-progress-bar", 
+                    style: { width: `${assessmentProgress.overall}%` } 
                 })
             ),
-
-            // Самооценка требований
-            React.createElement("div", null,
-                React.createElement("div", { className: "label" }, "Самооценка соответствия требованиям направления"),
-                reqs.length === 0 ? React.createElement("div", { className: "small" }, "Выберите направление — чек-лист появится автоматически.") :
-                React.createElement("div", { className: "row" },
-                    React.createElement("div", { className: "sa-meta" },
-                        React.createElement("span", { className: "small" }, "Отметьте все пункты и заполните обоснования — без этого нельзя выполнить финальное сохранение."),
-                        React.createElement(Badge, { 
-                            kind: reqs.length > 0 && selfChecks.filter(Boolean).length === reqs.length ? "ok" : "muted" 
-                        }, "Отмечено ", selfChecks.filter(Boolean).length, "/", reqs.length),
-                        React.createElement(Badge, { 
-                            kind: notesOkFlags.every(Boolean) ? "ok" : "muted" 
-                        }, "Обоснования ", notesOkFlags.filter(Boolean).length, "/", reqs.length)
-                    ),
-                    (!allChecked || !allNotesOk) && React.createElement("div", { 
-                        className: "small", 
-                        style: { color: "var(--yellow)" } 
-                    }, "Некоторые пункты не отмечены или без обоснований. Наведите на пункт — подсказка в тултипе."),
-                    allNotesEmpty && React.createElement("div", { 
-                        className: "small", 
-                        style: { color: "var(--yellow)" } 
-                    }, "Пока нет ни одного обоснования — добавьте по 1–2 предложения под каждый отмеченный пункт."),
-                    pilotTriadCount === 0 && React.createElement("div", { 
-                        className: "small", 
-                        style: { color: "var(--yellow)" } 
-                    }, "Чтобы продвинуться, укажите площадку пилота, хотя бы 1 источник данных и 1 систему/API."),
-                    computed.fit < 20 && React.createElement("div", { 
-                        className: "small", 
-                        style: { color: "var(--yellow)" } 
-                    }, "Fit низкий: уточните эффекты и заказчика, чтобы повысить релевантность."),
-                    React.createElement("ul", { className: "sa-list" }, reqs.map((req, idx) => {
-                        const checked = !!selfChecks[idx];
-                        const note = selfNotes[idx] || "";
-                        const noteOk = note.trim().length >= MIN_NOTE_CHARS && !isTrivialNote(note);
-                        const missing = !checked || !noteOk;
-                        const example = REQ_EXAMPLES[req] || DEFAULT_REQ_EXAMPLE;
-                        return React.createElement("li", {
-                            key: idx,
-                            className: "sa-item " + (missing ? "missing" : ""),
-                            title: "Отметьте и добавьте короткое обоснование"
-                        }, React.createElement("input", {
-                            type: "checkbox",
-                            checked,
-                            onChange: (e) => {
-                                const arr = selfChecks.slice();
-                                arr[idx] = e.target.checked;
-                                setSelfChecks(arr);
-                            },
-                            "aria-label": `Подтвердить: ${req}`
-                        }), React.createElement("div", null,
-                            React.createElement("div", { 
-                                className: "small", 
-                                style: { color: "inherit", marginBottom: 6 } 
-                            }, req),
-                            React.createElement("input", {
-                                className: "input note-input",
-                                value: note,
-                                onChange: (e) => {
-                                    const arr = selfNotes.slice();
-                                    arr[idx] = e.target.value;
-                                    setSelfNotes(arr);
-                                },
-                                placeholder: "Коротко опишите, как выполняется требование",
-                                "aria-label": `Обоснование: ${req}`,
-                                "aria-invalid": !noteOk
-                            }),
-                            React.createElement("div", { 
-                                className: "small", 
-                                style: { marginTop: 4 } 
-                            }, "Коротко: как именно решение выполняет требование (1–2 предложения)."),
-                            React.createElement("div", { 
-                                className: "small", 
-                                style: { marginTop: 2, color: "#334155" } 
-                            }, example)
-                        ));
-                    }))
+            
+            // Шаги самооценки
+            React.createElement("div", { className: "assessment-steps" },
+                [1, 2, 3, 4].map(step => 
+                    React.createElement("div", {
+                        key: step,
+                        className: `assessment-step ${currentStep === step ? 'active' : ''} ${assessmentProgress[['base', 'usefulness', 'idea', 'pilot'][step-1]] === 100 ? 'completed' : ''} ${step > 1 && !canProceedToStep(step) ? 'disabled' : ''}`,
+                        onClick: () => step <= 1 || canProceedToStep(step) ? setCurrentStep(step) : null
+                    }, step)
                 )
             ),
-
-            // Мягкие вопросы (UI-only)
-            React.createElement("div", null,
-                React.createElement("div", { className: "label" }, "Мягкие вопросы (не влияют на блокировку сохранения)"),
-                React.createElement("div", { className: "softq" }, SOFT_QUESTIONS.map((q, i) => {
-                    const val = softScores[i] || 0;
-                    const setVal = (v) => {
-                        const arr = softScores.slice();
-                        arr[i] = v;
-                        setSoftScores(arr);
-                    };
-                    return React.createElement("div", { 
-                        key: i, 
-                        className: "softq-item " + (val > 0 && val <= 2 ? "low" : "") 
-                    }, React.createElement("div", { 
-                        className: "small", 
-                        style: { color: "#0f172a" } 
-                    }, q), React.createElement("div", { 
-                        className: "chips", 
-                        role: "radiogroup", 
-                        "aria-label": q 
-                    }, [1, 2, 3, 4, 5].map((n) =>
-                        React.createElement("label", { 
-                            key: n, 
-                            className: "chip", 
-                            style: { cursor: "pointer" } 
-                        }, React.createElement("input", {
-                            type: "radio",
-                            name: `softq-${i}`,
-                            checked: val === n,
-                            onChange: () => setVal(n),
-                            "aria-label": `${q}: ${n}`
-                        }), React.createElement("span", null, n))
-                    ), val > 0 && val <= 2 && React.createElement(Badge, { kind: "warn" }, "Низкая оценка")));
-                }))
-            ),
-
-            // Пилот
-            React.createElement("div", null,
-                React.createElement("div", { className: "label" }, "Как пропилотировать (опционально)"),
-                React.createElement("div", { className: "row cols-2" },
-                    React.createElement("div", null,
-                        React.createElement("div", { className: "label" }, "Площадка пилота"),
-                        React.createElement("input", {
-                            className: "input",
-                            value: pilotSite,
-                            onChange: (e) => setPilotSite(e.target.value),
-                            placeholder: "Линия/маршрут/депо/причал"
-                        })
-                    ),
-                    React.createElement("div", null,
-                        React.createElement("div", { className: "label" }, "Юридические согласования"),
-                        React.createElement("input", {
-                            className: "input",
-                            value: pilotLegal,
-                            onChange: (e) => setPilotLegal(e.target.value),
-                            placeholder: "Ключевые юридические условия"
-                        })
-                    )
-                ),
-
-                dsPresets.length > 0 && React.createElement("div", { 
-                    className: "small", 
-                    style: { marginTop: 6 } 
-                }, "Быстрые пресеты (источники): ", React.createElement("span", { className: "chips" },
-                    dsPresets.map((s) =>
-                        React.createElement(Chip, { 
-                            key: s, 
-                            onClick: () => setPilotDataSources([...pilotDataSources, s]) 
-                        }, s, " +")
-                    )
-                )),
-                React.createElement(TagsInput, {
-                    label: "Источники данных",
-                    values: pilotDataSources,
-                    setValues: setPilotDataSources,
-                    placeholder: "Добавьте источники и нажмите Enter",
-                    ariaLabel: "Источники данных"
-                }),
-
-                intPresets.length > 0 && React.createElement("div", { 
-                    className: "small", 
-                    style: { marginTop: 6 } 
-                }, "Быстрые пресеты (точки подключения): ", React.createElement("span", { className: "chips" },
-                    intPresets.map((s) =>
-                        React.createElement(Chip, { 
-                            key: s, 
-                            onClick: () => setPilotIntegrations([...pilotIntegrations, s]) 
-                        }, s, " +")
-                    )
-                )),
-                React.createElement(TagsInput, {
-                    label: "Точки подключения (системы/API)",
-                    values: pilotIntegrations,
-                    setValues: setPilotIntegrations,
-                    placeholder: "Добавьте системы/API и нажмите Enter",
-                    ariaLabel: "Точки подключения (системы/API)"
-                }),
-
-                React.createElement("div", { className: "row cols-2" },
-                    React.createElement("div", null,
-                        React.createElement("div", { className: "label" }, "Ресурсы"),
-                        React.createElement("textarea", {
-                            className: "input textarea",
-                            value: pilotResources,
-                            onChange: (e) => setPilotResources(e.target.value),
-                            placeholder: "Команда, бюджет, оборудование и т.д."
-                        })
-                    ),
-                    React.createElement("div", null,
-                        React.createElement("div", { className: "label" }, "Шаги/план"),
-                        React.createElement("textarea", {
-                            className: "input textarea",
-                            value: pilotSteps,
-                            onChange: (e) => setPilotSteps(e.target.value),
-                            placeholder: "Основные шаги и сроки"
-                        })
-                    )
-                ),
-                React.createElement("div", null,
-                    React.createElement("div", { className: "label" }, "Критерии успеха"),
-                    React.createElement("textarea", {
-                        className: "input textarea",
-                        value: pilotSuccess,
-                        onChange: (e) => setPilotSuccess(e.target.value),
-                        placeholder: "KPI пилота, метрики достижения"
-                    })
-                )
-            ),
-
-            // Контекст направления
-            React.createElement("div", null,
-                React.createElement("div", { className: "label" }, "Контекст направления"),
-                !dirObj ? React.createElement("div", { className: "small" }, "Выберите направление — покажем кейсы, эффекты и подсказки.") :
-                React.createElement("div", { className: "card" },
-                    React.createElement("div", { className: "card-body" },
-                        React.createElement("div", { className: "small" }, dirObj.description),
-                        (dirObj.openCases || []).length > 0 && React.createElement("div", null,
-                            React.createElement("div", { 
-                                className: "small", 
-                                style: { marginBottom: 4 } 
-                            }, "Открытые кейсы:"),
-                            React.createElement("ul", { className: "list" },
-                                (dirObj.openCases || []).map((c, i) =>
-                                    React.createElement("li", { key: i, className: "small" }, c)
-                                )
-                            )
-                        ),
-                        React.createElement("div", { className: "chips" },
-                            React.createElement("span", { 
-                                className: "small", 
-                                style: { alignSelf: "center" } 
-                            }, "Реком. эффекты:"),
-                            (dirObj.recommendedEffects || []).map((e) =>
-                                React.createElement(Badge, { 
-                                    key: e, 
-                                    title: EFFECT_DEFINITIONS[e] || "" 
-                                }, e)
-                            )
-                        ),
-                        (dirObj.pilotHints || []).length > 0 && React.createElement("div", null,
-                            React.createElement("div", { 
-                                className: "small", 
-                                style: { marginBottom: 4 } 
-                            }, "Подсказки для пилота:"),
-                            React.createElement("ul", { className: "list" },
-                                (dirObj.pilotHints || []).map((h, i) =>
-                                    React.createElement("li", { key: i, className: "small" }, h)
-                                )
-                            )
-                        )
-                    )
-                )
-            ),
-
-            // Причины блокировок
-            unmet.length > 0 && React.createElement("div", { 
+            
+            // Содержание текущего шага
+            renderStep(currentStep),
+            
+            // Причины блокировок (только для шага 4)
+            currentStep === 4 && unmet.length > 0 && React.createElement("div", { 
                 className: "small", 
                 style: { color: "var(--red)" } 
             }, unmet.map((m, i) =>
                 React.createElement("div", { key: i }, "• ", m)
-            )));
+            ))
+            );
         }
+
+        // ОСТАВШАЯСЯ ЧАСТЬ КОДА БЕЗ ИЗМЕНЕНИЙ
+        // [DirectionDrawer, DirectionCreateDrawer, FTIMProjectDrawer, DirectionsDashboardFixed]
+        // Сохраняем весь существующий функционал без изменений
 
         /* ====================== Direction: редактор ====================== */
         function DirectionDrawer({ open, onClose, initialDirection, onSave }) {
@@ -1762,7 +1889,6 @@
             const [requirements, setRequirements] = useState([]);
             const [errors, setErrors] = useState({});
 
-            // Сброс формы при открытии/закрытии
             useEffect(() => {
                 if (open) {
                     setCode("");
@@ -1921,7 +2047,6 @@
             const [directionName, setDirectionName] = useState("");
             const [errors, setErrors] = useState({});
 
-            // Статусы для выпадающего списка
             const STATUS_OPTIONS = [
                 "Идея",
                 "В разработке", 
@@ -2256,7 +2381,6 @@
             };
 
             const createDirection = (newDirection) => {
-                // Проверяем, нет ли направления с таким же кодом
                 const exists = directions.find(d => d.code === newDirection.code);
                 if (exists) {
                     alert('Направление с таким кодом уже существует!');
@@ -2421,7 +2545,6 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                 }
             };
 
-            // Мини‑тур (первый запуск)
             const [showTour, setShowTour] = useState(() => {
                 try {
                     return localStorage.getItem(LS_TOUR_KEY) !== "1";
@@ -2931,7 +3054,6 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         );
                     })(),
                     (() => {
-                        // Похожие проекты: то же направление + совпадает заказчик или пересечение эффектов; топ-5 по Fit
                         const sims = projects
                             .filter(
                                 (p) =>
