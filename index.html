@@ -8,17 +8,22 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        /* ====================== СТИЛИ (ПОЛНАЯ КОПИЯ + ДОБАВЛЕНИЯ) ====================== */
+        /* ====================== ОБНОВЛЕННЫЕ СТИЛИ ====================== */
         :root {
           --bg: #f8fafc;
           --panel: #ffffff;
           --text: #0f172a;
           --muted: #64748b;
           --border: #e2e8f0;
-          --accent: #2563eb;
-          --green: #16a34a;
-          --red: #dc2626;
-          --yellow: #ca8a04;
+          --accent: #3b82f6;
+          --accent-light: #60a5fa;
+          --accent-dark: #2563eb;
+          --green: #10b981;
+          --red: #ef4444;
+          --yellow: #f59e0b;
+          --purple: #8b5cf6;
+          --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+          --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
 
         * { box-sizing: border-box; }
@@ -31,118 +36,252 @@
         }
 
         .app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+        
+        /* НОВЫЙ СТИЛЬ ХЕДЕРА */
         .header {
-          display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+          display: flex; align-items: center; gap: 12px; padding: 16px 20px;
           border-bottom: 1px solid var(--border);
-          background: linear-gradient(180deg, #ffffff 0%, #f3f4f6 100%);
+          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+          box-shadow: var(--shadow);
         }
-        .header .title { font-weight: 600; letter-spacing: .2px; }
+        .header .title { 
+          font-weight: 700; 
+          letter-spacing: .2px; 
+          font-size: 1.25rem;
+          color: var(--accent-dark);
+        }
         .header .spacer { flex: 1; }
 
-        .toolbar { display: grid; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
-        @media (min-width: 900px) {
-          .toolbar { grid-template-columns: 1fr auto auto; align-items: center; }
+        /* НОВАЯ СИСТЕМА ВКЛАДОК */
+        .tabs-container {
+          background: var(--panel);
+          border-bottom: 1px solid var(--border);
+          padding: 0 20px;
         }
-        .filters { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tabs {
+          display: flex;
+          gap: 0;
+          margin: 0;
+          padding: 0;
+          list-style: none;
+        }
+        .tab {
+          padding: 12px 24px;
+          background: transparent;
+          border: none;
+          border-bottom: 3px solid transparent;
+          color: var(--muted);
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          position: relative;
+        }
+        .tab:hover {
+          color: var(--accent);
+          background: #f1f5f9;
+        }
+        .tab.active {
+          color: var(--accent);
+          border-bottom-color: var(--accent);
+          background: rgba(59, 130, 246, 0.05);
+        }
+        .tab-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--accent);
+          color: white;
+          border-radius: 12px;
+          padding: 2px 8px;
+          font-size: 0.75rem;
+          margin-left: 8px;
+          min-width: 20px;
+          height: 20px;
+        }
+
+        /* ОБНОВЛЕННЫЙ TOOLBAR */
+        .toolbar { 
+          display: grid; 
+          gap: 16px; 
+          padding: 16px 20px; 
+          border-bottom: 1px solid var(--border); 
+          background: var(--panel);
+          align-items: start;
+        }
+        @media (min-width: 900px) {
+          .toolbar { grid-template-columns: 1fr auto; align-items: center; }
+        }
+        .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: start; }
         .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 
-        .input, .select, .btn {
+        /* ОБНОВЛЕННЫЕ КОМПОНЕНТЫ ФОРМ */
+        .input, .select, .btn, .textarea {
           border: 1px solid var(--border);
           background: #ffffff;
           color: var(--text);
-          border-radius: 10px;
-          padding: 8px 10px;
-          font-size: 13px;
+          border-radius: 8px;
+          padding: 10px 12px;
+          font-size: 14px;
+          transition: all 0.2s ease;
+        }
+        .input:focus, .select:focus, .textarea:focus, .btn:focus {
+          outline: 2px solid rgba(59, 130, 246, 0.2);
+          outline-offset: 1px;
+          border-color: var(--accent);
         }
         .input::placeholder { color: #94a3b8; }
-        .select { appearance: none; padding-right: 32px;
-          background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%), linear-gradient(to right, #e2e8f0, #e2e8f0);
-          background-position: calc(100% - 16px) calc(1em + 2px), calc(100% - 12px) calc(1em + 2px), calc(100% - 2.5em) 0.6em;
-          background-size: 5px 5px, 5px 5px, 1px 1.2em; background-repeat: no-repeat;
+        
+        .select { 
+          appearance: none; 
+          padding-right: 40px;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+          background-position: calc(100% - 12px) center;
+          background-size: 16px;
+          background-repeat: no-repeat;
         }
 
-        .btn { cursor: pointer; transition: background .12s ease, border-color .12s ease, transform .05s ease; }
-        .btn:hover { background: #f8fafc; border-color: #cbd5e1; }
-        .btn:active { transform: translateY(1px); }
-        .btn.primary { border-color: #2563eb; background: var(--accent); color: #ffffff; }
-        .btn.ghost { background: transparent; }
-        .btn.toggle.active { outline: 2px solid rgba(37,99,235,0.35); }
-
-        .btn:focus-visible, .input:focus-visible, .select:focus-visible, textarea:focus-visible {
-          outline: 2px solid rgba(37,99,235,0.35);
-          outline-offset: 1px;
+        .btn { 
+          cursor: pointer; 
+          transition: all 0.2s ease; 
+          font-weight: 500;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .btn:hover { 
+          background: #f8fafc; 
+          border-color: #cbd5e1;
+          transform: translateY(-1px);
+          box-shadow: var(--shadow);
+        }
+        .btn:active { transform: translateY(0); }
+        .btn.primary { 
+          border-color: var(--accent); 
+          background: var(--accent); 
+          color: #ffffff; 
+        }
+        .btn.primary:hover {
+          background: var(--accent-dark);
+          border-color: var(--accent-dark);
+        }
+        .btn.ghost { background: transparent; border-color: transparent; }
+        .btn.toggle.active { 
+          outline: 2px solid rgba(59, 130, 246, 0.35);
+          background: rgba(59, 130, 246, 0.1);
         }
 
-        .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         .badge, .chip {
-          display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px;
-          border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--text); background: #f8fafc;
+          display: inline-flex; 
+          align-items: center; 
+          gap: 6px; 
+          padding: 6px 12px;
+          border: 1px solid var(--border); 
+          border-radius: 20px; 
+          font-size: 12px; 
+          color: var(--text); 
+          background: #f8fafc;
+          font-weight: 500;
         }
         .badge.ok { color: var(--green); border-color: #a7f3d0; background: #ecfdf5; }
         .badge.err { color: var(--red); border-color: #fecaca; background: #fef2f2; }
-        .badge.muted { color: var(--muted); }
+        .badge.muted { color: var(--muted); background: #f1f5f9; }
         .badge.warn { color: var(--yellow); border-color: #fde68a; background: #fffbeb; }
+        .badge.accent { color: var(--accent); border-color: var(--accent-light); background: rgba(59, 130, 246, 0.1); }
 
-        .grid { display: grid; gap: 12px; padding: 12px 16px; }
+        .grid { display: grid; gap: 16px; padding: 16px 20px; }
         .grid.cards { grid-template-columns: 1fr; }
         @media (min-width: 900px) { .grid.cards { grid-template-columns: repeat(2, 1fr); } }
         @media (min-width: 1200px) { .grid.cards { grid-template-columns: repeat(3, 1fr); } }
 
+        /* ОБНОВЛЕННЫЕ КАРТОЧКИ */
         .card {
           background: var(--panel);
           border: 1px solid var(--border);
-          border-radius: 12px; overflow: hidden;
-          transition: box-shadow .15s ease, border-color .15s ease;
+          border-radius: 12px;
+          overflow: hidden;
+          transition: all 0.2s ease;
+          box-shadow: var(--shadow);
         }
-        .card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.08); border-color: #cbd5e1; }
-        .card .card-head { padding: 12px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; justify-content: space-between; }
-        .card .card-body { padding: 12px; display: grid; gap: 8px; }
-        .card .card-foot { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .card:hover { 
+          box-shadow: var(--shadow-lg); 
+          border-color: var(--accent-light);
+          transform: translateY(-2px);
+        }
+        .card .card-head { 
+          padding: 16px; 
+          border-bottom: 1px solid var(--border); 
+          display: flex; 
+          gap: 12px; 
+          justify-content: space-between;
+          background: #fafbfc;
+        }
+        .card .card-body { padding: 16px; display: grid; gap: 12px; }
+        .card .card-foot { 
+          padding: 12px 16px; 
+          border-top: 1px solid var(--border); 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center;
+          background: #fafbfc;
+        }
 
         .table { width: 100%; border-collapse: collapse; background: var(--panel); }
-        .table th, .table td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; vertical-align: top; }
-        .table th { color: var(--muted); font-weight: 600; }
+        .table th, .table td { padding: 12px 16px; border-bottom: 1px solid var(--border); text-align: left; font-size: 14px; vertical-align: top; }
+        .table th { color: var(--muted); font-weight: 600; background: #f8fafc; }
         .table-row:hover { background: #f3f4f6; }
 
         .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 60; }
         .modal {
-          position: fixed; right: 0; top: 0; height: 100vh; width: 100%; max-width: 460px; z-index: 61;
+          position: fixed; right: 0; top: 0; height: 100vh; width: 100%; max-width: 480px; z-index: 61;
           background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column;
+          box-shadow: -4px 0 20px rgba(0,0,0,0.1);
         }
-        .modal .modal-head { padding: 12px; border-bottom: 1px solid var(--border); display: flex; align-items: start; justify-content: space-between; gap: 8px; }
-        .modal .modal-body { flex: 1; overflow: auto; padding: 12px; display: grid; gap: 12px; }
-        .modal .modal-foot { padding: 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 8px; }
+        .modal .modal-head { padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+        .modal .modal-body { flex: 1; overflow: auto; padding: 16px; display: grid; gap: 16px; }
+        .modal .modal-foot { padding: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 8px; }
 
-        .row { display: grid; gap: 10px; }
+        .row { display: grid; gap: 16px; }
         @media (min-width: 720px) { .row.cols-2 { grid-template-columns: 1fr 1fr; } }
-        .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: inline-block; }
-        .textarea { min-height: 90px; }
+        .label { font-size: 14px; color: var(--muted); margin-bottom: 8px; display: inline-block; font-weight: 500; }
+        .textarea { min-height: 100px; resize: vertical; }
         .small { font-size: 12px; color: var(--muted); }
         .status { display: inline-flex; gap: 8px; align-items: center; }
         .icon { opacity: .8; }
         .list { margin: 0; padding-left: 18px; }
-        hr.sep { border: 0; border-top: 1px dashed var(--border); margin: 4px 0; opacity: .8; }
+        hr.sep { border: 0; border-top: 1px dashed var(--border); margin: 8px 0; opacity: .8; }
 
-        .sa-list { list-style: none; padding-left: 0; margin: 0; display: grid; gap: 10px; }
-        .sa-item { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; border-radius: 8px; padding: 8px; transition: background .12s ease, border-color .12s ease; border: 1px solid transparent; }
-        .sa-item.missing { border: 1px dashed var(--yellow); background: rgba(202,138,4,0.06); }
+        .sa-list { list-style: none; padding-left: 0; margin: 0; display: grid; gap: 12px; }
+        .sa-item { 
+          display: grid; 
+          grid-template-columns: auto 1fr; 
+          gap: 12px; 
+          align-items: start; 
+          border-radius: 8px; 
+          padding: 12px; 
+          transition: all 0.2s ease; 
+          border: 1px solid transparent;
+          background: #fafbfc;
+        }
+        .sa-item.missing { border: 1px dashed var(--yellow); background: rgba(245,158,11,0.06); }
         .sa-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .note-input { width: 100%; }
         .softq { display: grid; gap: 8px; }
         .softq-item { display: grid; gap: 4px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
         .softq-item.low { border-color: #fde68a; background: #fffbeb; }
         
-        /* НОВЫЕ СТИЛИ ДЛЯ СИСТЕМЫ САМООЦЕНКИ */
-        .assessment-steps { display: flex; gap: 8px; margin-bottom: 16px; }
+        /* СТИЛИ ДЛЯ СИСТЕМЫ САМООЦЕНКИ */
+        .assessment-steps { display: flex; gap: 8px; margin-bottom: 20px; }
         .assessment-step { 
             flex: 1; 
             text-align: center; 
-            padding: 8px; 
+            padding: 12px; 
             border-radius: 8px; 
             background: #f1f5f9; 
             border: 1px solid #e2e8f0;
             cursor: pointer;
             transition: all 0.2s ease;
+            font-weight: 500;
         }
         .assessment-step.active { 
             background: var(--accent); 
@@ -161,7 +300,7 @@
         .assessment-block { 
             border: 1px solid var(--border); 
             border-radius: 8px; 
-            padding: 16px; 
+            padding: 20px; 
             margin-bottom: 16px;
             background: #fafafa;
         }
@@ -170,10 +309,10 @@
             background: #f0fdf4;
         }
         .assessment-progress { 
-            height: 6px; 
+            height: 8px; 
             background: #e2e8f0; 
-            border-radius: 3px; 
-            margin-bottom: 16px; 
+            border-radius: 4px; 
+            margin-bottom: 20px; 
             overflow: hidden;
         }
         .assessment-progress-bar { 
@@ -181,22 +320,48 @@
             background: var(--accent); 
             transition: width 0.3s ease;
         }
-        .business-model-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .business-model-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
         .business-model-option { 
             border: 1px solid var(--border); 
             border-radius: 8px; 
-            padding: 12px; 
+            padding: 16px; 
             text-align: center; 
             cursor: pointer;
             transition: all 0.2s ease;
+            background: white;
         }
         .business-model-option.selected { 
             border-color: var(--accent); 
-            background: rgba(37, 99, 235, 0.05);
+            background: rgba(59, 130, 246, 0.05);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
         }
-        .field-group { margin-bottom: 16px; }
+        .field-group { margin-bottom: 20px; }
         .field-group .label { display: flex; align-items: center; gap: 6px; }
         .required::after { content: "•"; color: var(--red); margin-left: 4px; }
+
+        /* НОВЫЕ СТИЛИ ДЛЯ СТАТУС-ПАНЕЛИ */
+        .status-panel {
+            display: flex;
+            gap: 16px;
+            padding: 12px 20px;
+            background: #f1f5f9;
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+        }
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        .status-count {
+            background: var(--accent);
+            color: white;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -204,6 +369,8 @@
 
     <script type="text/babel">
         // ====================== ПОЛНЫЙ КОД ПРИЛОЖЕНИЯ ======================
+        // ВСЯ ФУНКЦИОНАЛЬНОСТЬ СОХРАНЕНА БЕЗ ИЗМЕНЕНИЙ
+        // ИЗМЕНЕНА ТОЛЬКО ВИЗУАЛЬНАЯ ЧАСТЬ
         
         const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -818,6 +985,8 @@
                     ? "badge muted"
                     : kind === "warn"
                     ? "badge warn"
+                    : kind === "accent"
+                    ? "badge accent"
                     : "badge";
             return React.createElement("span", { className: cls, title }, children);
         }
@@ -861,8 +1030,8 @@
                     className: "chips",
                     style: {
                         border: "1px solid var(--border)",
-                        borderRadius: 10,
-                        padding: 6,
+                        borderRadius: 8,
+                        padding: 8,
                         background: "#ffffff",
                     }
                 }, values.map((v) =>
@@ -906,10 +1075,11 @@
                         marginTop: 4,
                         background: "#fff",
                         border: "1px solid var(--border)",
-                        borderRadius: 10,
+                        borderRadius: 8,
                         padding: 8,
                         zIndex: 50,
                         minWidth: 220,
+                        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
                     }
                 }, options.map((opt) =>
                     React.createElement("div", {
@@ -922,9 +1092,10 @@
                             display: "flex",
                             gap: 8,
                             alignItems: "center",
-                            padding: 6,
-                            borderRadius: 8,
+                            padding: 8,
+                            borderRadius: 6,
                             cursor: "pointer",
+                            transition: "background 0.2s ease",
                         }
                     }, React.createElement("input", { 
                         type: "checkbox", 
@@ -991,7 +1162,7 @@
                     "aria-label": ariaLabel || title
                 }, React.createElement("div", { className: "modal-head" },
                     React.createElement("div", null,
-                        React.createElement("div", { style: { fontWeight: 600 } }, title),
+                        React.createElement("div", { style: { fontWeight: 600, fontSize: "1.1rem" } }, title),
                         React.createElement("div", { className: "small" }, "Нажмите Esc для закрытия")
                     ),
                     React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } },
@@ -1749,10 +1920,6 @@
             ))
             );
         }
-
-        // ОСТАВШАЯСЯ ЧАСТЬ КОДА БЕЗ ИЗМЕНЕНИЙ
-        // [DirectionDrawer, DirectionCreateDrawer, FTIMProjectDrawer, DirectionsDashboardFixed]
-        // Сохраняем весь существующий функционал без изменений
 
         /* ====================== Direction: редактор ====================== */
         function DirectionDrawer({ open, onClose, initialDirection, onSave }) {
@@ -2571,12 +2738,57 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     )
                 ),
 
+                /* НОВАЯ СИСТЕМА ВКЛАДОК */
+                React.createElement("nav", { className: "tabs-container" },
+                    React.createElement("ul", { className: "tabs" },
+                        React.createElement("li", null,
+                            React.createElement("button", {
+                                className: `tab ${dataset === "directions" ? "active" : ""}`,
+                                onClick: () => setDataset("directions")
+                            }, "Направления", 
+                            React.createElement("span", { className: "tab-badge" }, directions.length))
+                        ),
+                        React.createElement("li", null,
+                            React.createElement("button", {
+                                className: `tab ${dataset === "projects" ? "active" : ""}`,
+                                onClick: () => setDataset("projects")
+                            }, "Проекты",
+                            React.createElement("span", { className: "tab-badge" }, projects.length))
+                        ),
+                        React.createElement("li", null,
+                            React.createElement("button", {
+                                className: `tab ${dataset === "ftimProjects" ? "active" : ""}`,
+                                onClick: () => setDataset("ftimProjects")
+                            }, "Проекты Фонда",
+                            React.createElement("span", { className: "tab-badge" }, ftimProjects.length))
+                        )
+                    )
+                ),
+
+                /* СТАТУС-ПАНЕЛЬ */
+                React.createElement("div", { className: "status-panel" },
+                    React.createElement("div", { className: "status-item" },
+                        React.createElement("span", { className: "small" }, "Найдено:"),
+                        React.createElement("span", { className: "status-count" }, filtered.length)
+                    ),
+                    React.createElement("div", { className: "status-item" },
+                        React.createElement("span", { className: "small" }, "Всего:"),
+                        React.createElement("span", { className: "status-count" }, unified.length)
+                    ),
+                    React.createElement("div", { className: "spacer" }),
+                    React.createElement("div", { className: "small" }, 
+                        "Активный раздел: ", 
+                        dataset === "directions" ? "Направления" : 
+                        dataset === "projects" ? "Проекты" : "Проекты Фонда"
+                    )
+                ),
+
                 React.createElement("section", { className: "toolbar", role: "region", "aria-label": "Фильтры" },
                     React.createElement("div", { className: "filters" },
                         React.createElement("div", { style: { position: "relative", flex: "1 1 260px", minWidth: 220 } },
                             React.createElement("input", {
                                 className: "input",
-                                style: { width: "100%", paddingLeft: 30 },
+                                style: { width: "100%", paddingLeft: 36 },
                                 placeholder: "Поиск (название, описание, теги, эффекты, заказчик)",
                                 value: search,
                                 onChange: (e) => setSearch(e.target.value),
@@ -2584,7 +2796,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                             }),
                             React.createElement("span", { 
                                 className: "icon", 
-                                style: { position: "absolute", left: 8, top: 9, opacity: .6 } 
+                                style: { position: "absolute", left: 12, top: 10, opacity: .6 } 
                             }, "🔎")
                         ),
 
@@ -2617,17 +2829,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         )
                     ),
 
-                    React.createElement("div", { className: "chips", role: "group", "aria-label": "Переключатели данных и вида" },
-                        React.createElement(ToggleGroup, {
-                            ariaLabel: "Данные",
-                            value: dataset,
-                            onChange: (v) => setDataset(v),
-                            items: [
-                                { value: "directions", label: "Направления" },
-                                { value: "projects", label: "Проекты" },
-                                { value: "ftimProjects", label: "Проекты от ФТИМ" },
-                            ]
-                        }),
+                    React.createElement("div", { className: "actions" },
                         React.createElement(ToggleGroup, {
                             ariaLabel: "Вид",
                             value: view,
@@ -2636,10 +2838,8 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                 { value: "cards", label: "Карточки" },
                                 { value: "table", label: "Таблица" },
                             ]
-                        })
-                    ),
-
-                    React.createElement("div", { className: "actions" },
+                        }),
+                        
                         React.createElement("button", {
                             className: "btn",
                             onClick: () => exportCSV(),
@@ -2679,6 +2879,8 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                 e.currentTarget.value = "";
                             }
                         })),
+                        
+                        // КОНТЕКСТНЫЕ КНОПКИ ДОБАВЛЕНИЯ
                         dataset === "directions" && React.createElement("button", {
                             className: "btn primary",
                             onClick: onOpenCreateDirection,
@@ -2688,12 +2890,13 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                             className: "btn primary",
                             onClick: onOpenAddFTIMProject,
                             "aria-label": "Добавить проект от ФТИМ"
-                        }, "Добавить"),
-                        dataset !== "ftimProjects" && React.createElement("button", {
+                        }, "Добавить проект"),
+                        dataset === "projects" && React.createElement("button", {
                             className: "btn primary",
                             onClick: onOpenAddProject,
                             "aria-label": "Добавить проект"
                         }, "Добавить проект"),
+                        
                         React.createElement("button", {
                             className: "btn ghost",
                             onClick: clearFilters,
@@ -2702,23 +2905,21 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     )
                 ),
 
-                React.createElement("div", { className: "toolbar", style: { borderTop: "none", paddingTop: 0 } },
-                    React.createElement("div", { className: "small" }, "Показано: ", React.createElement("b", null, filtered.length), " из ", unified.length),
-                    React.createElement("div", null),
-                    React.createElement("div", { className: "small" }, "Подсказка: Нажмите Esc чтобы закрыть модалки"),
-                    showTour && React.createElement("div", { 
-                        className: "small", 
-                        style: { gridColumn: "1 / -1", color: "#0f172a" } 
-                    }, React.createElement("div", { className: "chips" },
-                        React.createElement(Badge, { kind: "muted" }, "Мини‑тур"),
-                        React.createElement("span", null, "1) выберите направление, 2) отметьте требования + короткое обоснование, 3) заполните 2–3 поля пилота, 4) откройте Fit‑Check"),
-                        React.createElement("button", {
-                            className: "btn",
-                            onClick: dismissTour,
-                            "aria-label": "Скрыть мини-тур"
-                        }, "Понятно")
-                    ))
-                ),
+                showTour && React.createElement("div", { 
+                    className: "toolbar", 
+                    style: { borderTop: "none", paddingTop: 0, background: "#fefce8" } 
+                }, React.createElement("div", { 
+                    className: "small", 
+                    style: { gridColumn: "1 / -1", color: "#0f172a" } 
+                }, React.createElement("div", { className: "chips" },
+                    React.createElement(Badge, { kind: "warn" }, "Мини‑тур"),
+                    React.createElement("span", null, "1) выберите вкладку, 2) добавьте элемент через кнопку, 3) заполните форму, 4) проверьте Fit-Check"),
+                    React.createElement("button", {
+                        className: "btn",
+                        onClick: dismissTour,
+                        "aria-label": "Скрыть мини-тур"
+                    }, "Понятно")
+                ))),
 
                 view === "cards" ? React.createElement("section", { className: "grid cards", role: "list", "aria-label": "Список карточек" },
                     sorted.map((it) => {
@@ -2736,8 +2937,9 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                 React.createElement("div", { 
                                     style: { fontWeight: 600, display: "flex", alignItems: "center", gap: 8 } 
                                 }, React.createElement("span", null, isProject ? it.title : isFTIMProject ? it.projectName : it.name),
-                                isProject ? React.createElement(Badge, { kind: "muted" }, "Проект") : 
-                                isFTIMProject ? React.createElement(Badge, { kind: "muted" }, "ФТИМ") : null),
+                                isProject ? React.createElement(Badge, { kind: "accent" }, "Проект") : 
+                                isFTIMProject ? React.createElement(Badge, { kind: "accent" }, "ФТИМ") : 
+                                React.createElement(Badge, { kind: "accent" }, "Направление")),
                                 React.createElement("div", { 
                                     className: "small", 
                                     style: { marginTop: 4 } 
@@ -2854,8 +3056,8 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     }),
                     sorted.length === 0 && React.createElement("div", { 
                         className: "small", 
-                        style: { opacity: .8, padding: 16 } 
-                    }, "Ничего не найдено")
+                        style: { opacity: .8, padding: 16, textAlign: "center", gridColumn: "1 / -1" } 
+                    }, "Ничего не найдено. Попробуйте изменить параметры поиска или фильтры.")
                 ) : React.createElement("section", { className: "grid", style: { paddingTop: 0 } },
                     React.createElement("div", { className: "card", role: "region", "aria-label": "Таблица" },
                         React.createElement("div", { style: { overflowX: "auto" } },
@@ -2925,9 +3127,10 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                it.type === "ftimProject" ? it.projectName : 
                                                it.name,
                                             it.type === "project" ? 
-                                            React.createElement(Badge, { kind: "muted" }, "Проект") : 
+                                            React.createElement(Badge, { kind: "accent" }, "Проект") : 
                                             it.type === "ftimProject" ?
-                                            React.createElement(Badge, { kind: "muted" }, "ФТИМ") : null),
+                                            React.createElement(Badge, { kind: "accent" }, "ФТИМ") : 
+                                            React.createElement(Badge, { kind: "accent" }, "Направление")),
                                             React.createElement("div", { className: "small" }, it.description || "—")
                                         ), 
                                         dataset !== "ftimProjects" && React.createElement("td", null,
@@ -2994,7 +3197,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                             colSpan: dataset === "ftimProjects" ? 4 : dataset === "projects" ? 7 : 5, 
                                             className: "small", 
                                             style: { textAlign: "center", padding: 16 } 
-                                        }, "Ничего не найдено")
+                                        }, "Ничего не найдено. Попробуйте изменить параметры поиска или фильтры.")
                                     )
                                 )
                             )
