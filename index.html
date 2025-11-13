@@ -362,6 +362,27 @@
             font-size: 12px;
             font-weight: 600;
         }
+        
+        /* Стиль для блока выбора кейса */
+        .case-alignment-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .case-alignment-badge.original {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            color: #f59e0b;
+        }
+        .case-alignment-badge.aligned {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #10b981;
+        }
     </style>
 </head>
 <body>
@@ -369,8 +390,7 @@
 
     <script type="text/babel">
         // ====================== ПОЛНЫЙ КОД ПРИЛОЖЕНИЯ ======================
-        // ВСЯ ФУНКЦИОНАЛЬНОСТЬ СОХРАНЕНА БЕЗ ИЗМЕНЕНИЙ
-        // ИЗМЕНЕНА ТОЛЬКО ВИЗУАЛЬНАЯ ЧАСТЬ
+        // С ДОБАВЛЕННЫМ ФУНКЦИОНАЛОМ ВЫБОРА ОТКРЫТЫХ КЕЙСОВ
         
         const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -514,7 +534,7 @@
                 requirements: [
                     "Совместимость с существующими валидаторами и биллингом",
                     "Защита платёжных данных (PCI DSS/аналогичные требования)",
-                    "Механизм верификации личности/правомерности оплаты при необходимости",
+                    "Механизм верификации личности/правомерности оплата при необходимости",
                     "Согласование с операторами и регулятором",
                 ],
             },
@@ -694,26 +714,43 @@
             return b.reduce((acc, x) => acc + (set.has(x) ? 1 : 0), 0);
         }
 
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ: Расчет FitScore с учетом выбора кейса
         function computeFitScore(project, directions) {
             const dir = directions.find((d) => d.name === project.directionName);
             if (!dir) return 0;
-            const dirAlign = openCasesMatchRatio(
-                project.title || "",
-                project.shortDescription || "",
-                dir.openCases || []
-            );
+            
+            // НОВАЯ ЛОГИКА: Расчет соответствия кейсам
+            let caseAlignmentScore;
+            if (project.selectedOpenCase === "ORIGINAL") {
+                // Бонус за оригинальность
+                caseAlignmentScore = 0.8; // 80% за инновационность
+            } else if (project.selectedOpenCase && dir.openCases?.includes(project.selectedOpenCase)) {
+                // Полное соответствие выбранному кейсу
+                caseAlignmentScore = 1.0; // 100% за решение актуальной проблемы
+            } else {
+                // Автоматический анализ (старая логика для обратной совместимости)
+                caseAlignmentScore = openCasesMatchRatio(
+                    project.title || "",
+                    project.shortDescription || "",
+                    dir.openCases || []
+                );
+            }
+            
             const effRecommended = dir.recommendedEffects || [];
             const effMatch =
                 effRecommended.length > 0
                     ? intersectCount(project.effectTags || [], effRecommended) /
                       effRecommended.length
                     : 0;
+                    
             const custMatch = (dir.customersRecommended || []).includes(
                 project.customer || ""
             )
                 ? 1
                 : 0;
-            const fit = 100 * (0.5 * dirAlign + 0.3 * effMatch + 0.2 * custMatch);
+
+            // НОВАЯ ФОРМУЛА с приоритетом выбора кейса
+            const fit = 100 * (0.4 * caseAlignmentScore + 0.3 * effMatch + 0.3 * custMatch);
             return Math.round(fit);
         }
 
@@ -789,7 +826,8 @@
             
             const usefulnessFields = [
                 project.directionName,
-                project.customer
+                project.customer,
+                project.selectedOpenCase // НОВОЕ ПОЛЕ: выбор кейса
             ];
             const usefulnessCompleted = usefulnessFields.filter(f => f && f.length > 0).length;
             const usefulnessProgress = Math.round((usefulnessCompleted / usefulnessFields.length) * 100);
@@ -885,6 +923,8 @@
                 effectTags: Array.isArray(p.effectTags) ? p.effectTags : [],
                 DITTags: Array.isArray(p.DITTags) ? p.DITTags : [],
                 shortDescription: p.shortDescription || "",
+                // НОВОЕ ПОЛЕ: соответствие открытому кейсу
+                selectedOpenCase: p.selectedOpenCase || "", // "" | "ORIGINAL" | конкретный кейс
                 // Новые поля для расширенной самооценки
                 problemStatement: p.problemStatement || "",
                 businessModel: p.businessModel || "",
@@ -1261,6 +1301,9 @@
             const [selfNotes, setSelfNotes] = useState([]);
             const [errors, setErrors] = useState({});
 
+            // НОВОЕ СОСТОЯНИЕ: выбор открытого кейса
+            const [selectedOpenCase, setSelectedOpenCase] = useState("");
+
             // Расчет прогресса
             const assessmentProgress = useMemo(() => {
                 return computeAssessmentProgress({
@@ -1269,6 +1312,7 @@
                     shortDescription,
                     directionName,
                     customer,
+                    selectedOpenCase, // НОВОЕ ПОЛЕ
                     targetAudience,
                     problemStatement,
                     businessModel,
@@ -1280,7 +1324,7 @@
                         stepsPlan: pilotSteps
                     }
                 });
-            }, [title, teamName, shortDescription, directionName, customer, targetAudience, 
+            }, [title, teamName, shortDescription, directionName, customer, selectedOpenCase, targetAudience, 
                 problemStatement, businessModel, businessModelDescription, productDescription,
                 pilotSite, pilotResources, pilotSteps]);
 
@@ -1301,6 +1345,9 @@
                     setEffectTags(initialProject.effectTags || []);
                     setDITTags(initialProject.DITTags || []);
                     setShortDescription(initialProject.shortDescription || "");
+                    
+                    // НОВОЕ ПОЛЕ
+                    setSelectedOpenCase(initialProject.selectedOpenCase || "");
                     
                     // Новые поля
                     setProblemStatement(initialProject.problemStatement || "");
@@ -1338,6 +1385,9 @@
                     setEffectTags([]);
                     setDITTags([]);
                     setShortDescription("");
+                    
+                    // НОВОЕ ПОЛЕ
+                    setSelectedOpenCase("");
                     
                     // Новые поля
                     setProblemStatement("");
@@ -1381,6 +1431,8 @@
                     effectTags,
                     DITTags,
                     shortDescription,
+                    // НОВОЕ ПОЛЕ
+                    selectedOpenCase,
                     problemStatement,
                     businessModel,
                     businessModelDescription,
@@ -1409,6 +1461,7 @@
                 effectTags,
                 DITTags,
                 shortDescription,
+                selectedOpenCase, // НОВОЕ ПОЛЕ
                 problemStatement,
                 businessModel,
                 businessModelDescription,
@@ -1478,6 +1531,8 @@
                     effectTags,
                     DITTags,
                     shortDescription,
+                    // НОВОЕ ПОЛЕ
+                    selectedOpenCase,
                     // Новые поля
                     problemStatement,
                     businessModel,
@@ -1607,6 +1662,30 @@
                                     CUSTOMERS.map((c) =>
                                         React.createElement("option", { key: c, value: c }, c)
                                     ))
+                                )
+                            ),
+                            
+                            // НОВЫЙ БЛОК: Соответствие открытым кейсам
+                            dirObj && dirObj.openCases && dirObj.openCases.length > 0 && 
+                            React.createElement("div", { className: "field-group" },
+                                React.createElement("div", { className: "label" }, "Соответствие открытому кейсу"),
+                                React.createElement("select", {
+                                    className: "select",
+                                    value: selectedOpenCase,
+                                    onChange: (e) => setSelectedOpenCase(e.target.value)
+                                }, 
+                                    React.createElement("option", { value: "" }, "Выберите соответствующий кейс"),
+                                    dirObj.openCases.map((caseItem, index) =>
+                                        React.createElement("option", { key: index, value: caseItem }, caseItem)
+                                    ),
+                                    React.createElement("option", { value: "ORIGINAL" }, "Оригинальная идея (не соответствует указанным кейсам)")
+                                ),
+                                React.createElement("div", { className: "small" },
+                                    selectedOpenCase === "ORIGINAL" 
+                                        ? "💡 Оригинальные идеи особенно ценны для экосистемы"
+                                        : selectedOpenCase 
+                                        ? `✅ Решение кейса: "${selectedOpenCase}"`
+                                        : "Выберите кейс, который решает ваша идея, или отметьте её как оригинальную"
                                 )
                             ),
                             
@@ -1831,7 +1910,7 @@
                     case 2: // К оценке полезности
                         return title.trim() && teamName.trim() && shortDescription.trim();
                     case 3: // К самооценке идеи  
-                        return directionName && customer;
+                        return directionName && customer && selectedOpenCase; // ДОБАВЛЕН selectedOpenCase
                     case 4: // К пилотированию
                         return true; // Всегда можно перейти к пилотированию
                     default:
@@ -2576,7 +2655,7 @@
                 const items = sorted;
                 const headers =
                     dataset === "projects"
-                        ? ["Тип", "Название", "Заказчик", "Направление", "Эффекты", "ЦА", "Теги ДИТ", "Описание", "Fit", "Pilot", "Статус"]
+                        ? ["Тип", "Название", "Заказчик", "Направление", "Эффекты", "ЦА", "Теги ДИТ", "Описание", "Fit", "Pilot", "Статус", "Соответствие кейсу"]
                         : dataset === "ftimProjects"
                         ? ["Тип", "Проект", "Описание", "Текущий статус", "Пилотная площадка", "Статус", "Направление"]
                         : ["Тип", "Название", "Описание", "Реком. заказчики", "Открытые кейсы", "Реком. эффекты", "Реком. теги ДИТ", "Стейкхолдеры"];
@@ -2600,6 +2679,7 @@
                             it.fitScore ?? "",
                             it.pilotReadiness ?? "",
                             it.status || "",
+                            it.selectedOpenCase || "" // НОВОЕ ПОЛЕ
                         ]
                             .map(escape)
                             .join(",")
@@ -2642,6 +2722,7 @@
                     parts.push(
 `# ${it.title || "Без названия"}
 Заказчик: ${it.customer || "—"} • Направление: ${it.directionName || "—"} • Эффекты: ${(it.effectTags || []).join(", ") || "—"} • Теги ДИТ: ${(it.DITTags || []).join(", ") || "—"}
+Соответствие кейсу: ${it.selectedOpenCase === "ORIGINAL" ? "💡 Оригинальная идея" : it.selectedOpenCase || "—"}
 
 ${it.shortDescription || "—"}
 
@@ -2962,6 +3043,13 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                     }, e)
                                 )
                             ),
+                            // НОВОЕ: Отображение соответствия кейсу
+                            isProject && it.selectedOpenCase && React.createElement("div", { className: "chips" },
+                                React.createElement("span", { 
+                                    className: `case-alignment-badge ${it.selectedOpenCase === "ORIGINAL" ? "original" : "aligned"}`,
+                                    title: it.selectedOpenCase === "ORIGINAL" ? "Оригинальная идея" : `Решение кейса: ${it.selectedOpenCase}`
+                                }, it.selectedOpenCase === "ORIGINAL" ? "💡 Оригинальная идея" : `🎯 Кейс: ${it.selectedOpenCase}`)
+                            ),
                             isProject ? React.createElement(React.Fragment, null,
                                 React.createElement("div", { className: "small" },
                                     React.createElement("span", { className: "muted" }, "Направление:"), " ", it.directionName || "—"),
@@ -3098,6 +3186,14 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                             })),
                                         dataset === "projects" && React.createElement("th", null, 
                                             React.createElement(SortHeader, {
+                                                label: "Кейс",
+                                                sortKey: "name",
+                                                currentKey: sortKey,
+                                                sortDir,
+                                                onSort
+                                            })),
+                                        dataset === "projects" && React.createElement("th", null, 
+                                            React.createElement(SortHeader, {
                                                 label: "Fit",
                                                 sortKey: "fit",
                                                 currentKey: sortKey,
@@ -3154,6 +3250,15 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                             it.type === "project" ? it.directionName || "—" : 
                                             it.type === "ftimProject" ? it.directionName || "—" :
                                             it.name),
+                                        // НОВЫЙ СТОЛБЕЦ: Соответствие кейсу
+                                        dataset === "projects" && React.createElement("td", null,
+                                            it.selectedOpenCase ? 
+                                                React.createElement("span", { 
+                                                    className: `case-alignment-badge ${it.selectedOpenCase === "ORIGINAL" ? "original" : "aligned"}`,
+                                                    title: it.selectedOpenCase === "ORIGINAL" ? "Оригинальная идея" : `Решение кейса: ${it.selectedOpenCase}`
+                                                }, it.selectedOpenCase === "ORIGINAL" ? "💡 Оригинальная" : "🎯 Кейс") 
+                                            : "—"
+                                        ),
                                         dataset === "projects" && React.createElement("td", null, 
                                             it.type === "project" ? 
                                             React.createElement(Badge, null, "Fit ", it.fitScore ?? 0, "%") : "—"),
@@ -3194,7 +3299,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                     ),
                                     sorted.length === 0 && React.createElement("tr", null,
                                         React.createElement("td", { 
-                                            colSpan: dataset === "ftimProjects" ? 4 : dataset === "projects" ? 7 : 5, 
+                                            colSpan: dataset === "ftimProjects" ? 4 : dataset === "projects" ? 8 : 5, 
                                             className: "small", 
                                             style: { textAlign: "center", padding: 16 } 
                                         }, "Ничего не найдено. Попробуйте изменить параметры поиска или фильтры.")
@@ -3228,6 +3333,13 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     React.createElement("div", null,
                         React.createElement("div", { style: { fontWeight: 600 } }, fitItem.title),
                         React.createElement("div", { className: "small" }, "Направление: ", fitItem.directionName || "—")
+                    ),
+                    // НОВОЕ: Информация о соответствии кейсу в Fit-Check
+                    fitItem.selectedOpenCase && React.createElement("div", { className: "chips" },
+                        React.createElement("span", { 
+                            className: `case-alignment-badge ${fitItem.selectedOpenCase === "ORIGINAL" ? "original" : "aligned"}`,
+                            title: fitItem.selectedOpenCase === "ORIGINAL" ? "Оригинальная идея" : `Решение кейса: ${fitItem.selectedOpenCase}`
+                        }, fitItem.selectedOpenCase === "ORIGINAL" ? "💡 Оригинальная идея" : `🎯 Решение кейса: ${fitItem.selectedOpenCase}`)
                     ),
                     React.createElement("div", { className: "chips" },
                         (fitItem.effectTags || []).map((e) =>
