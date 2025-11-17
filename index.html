@@ -466,6 +466,139 @@
             color: var(--text);
             
         }
+        .instruction-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.8);
+        z-index: 200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        animation: fadeIn 0.3s ease-out;
+        }
+    
+        .instruction-modal {
+            background: var(--panel);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+            animation: modalAppear 0.3s ease-out;
+        }
+    
+        .instruction-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+            color: white;
+            border-radius: 16px 16px 0 0;
+        }
+    
+        .instruction-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+    
+        .instruction-body {
+            flex: 1;
+            overflow: auto;
+            padding: 24px;
+            line-height: 1.6;
+        }
+    
+        .instruction-footer {
+            padding: 20px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+    
+        .instruction-section {
+            margin-bottom: 24px;
+        }
+    
+        .instruction-section h3 {
+            color: var(--accent-dark);
+            margin: 0 0 12px 0;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    
+        .instruction-section p {
+            margin: 0 0 12px 0;
+            color: var(--text);
+        }
+    
+        .instruction-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+    
+        .instruction-feature {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+    
+        .instruction-feature h4 {
+            margin: 0 0 8px 0;
+            color: var(--accent);
+            font-size: 1rem;
+        }
+    
+        .instruction-feature p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+    
+        .metric-explanation {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 12px 0;
+        }
+    
+        .metric-explanation h4 {
+            margin: 0 0 8px 0;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    
+        .metric-score {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+    
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -709,6 +842,8 @@
         const LS_PROJECTS_V2 = "mvb_projects_v2";
         const LS_TOUR_KEY = "mvb_tour_dismissed_v1";
         const LS_FTIM_PROJECTS = "mvb_ftim_projects_v1";
+        const LS_INSTRUCTION_KEY = "mvb_instruction_dismissed_v1";
+
 
         function tryParse(raw) {
             try {
@@ -2633,6 +2768,20 @@
 
             const [ftimProjOpen, setFtimProjOpen] = useState(false);
             const [ftimProjEditing, setFtimProjEditing] = useState(null);
+            const [showInstruction, setShowInstruction] = useState(() => {
+                try {
+                    return localStorage.getItem(LS_INSTRUCTION_KEY) !== "1";
+                } catch {
+                    return true;
+                }
+            });
+            const dismissInstruction = () => {
+                try {
+                    localStorage.setItem(LS_INSTRUCTION_KEY, "1");
+                } catch {}
+                setShowInstruction(false);
+            };
+             const [manualInstructionOpen, setManualInstructionOpen] = useState(false);
 
             const directionNamesAll = useMemo(() => directions.map((d) => d.name), [directions]);
 
@@ -3108,6 +3257,11 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                             onClick: () => exportPitch(),
                             "aria-label": "Экспорт Pitch"
                         }, "Экспорт Pitch"),
+                        React.createElement("button", {
+                            className: "btn",
+                            onClick: () => setManualInstructionOpen(true),
+                            "aria-label": "Показать инструкцию"
+                        }, "📚 Инструкция"),
                         React.createElement("label", {
                             className: "btn",
                             "aria-label": "Импорт JSON",
@@ -3610,8 +3764,180 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     directions,
                     initialProject: ftimProjEditing,
                     onSave: (p) => addOrUpdateFTIMProject(p)
+                }),
+                React.createElement(InstructionPopup, {
+                    open: showInstruction || manualInstructionOpen,
+                    onClose: () => {
+                        if (showInstruction) {
+                            dismissInstruction();
+                        }
+                        setManualInstructionOpen(false);
+                    }
                 })
             );
+        }
+                /* ====================== КОМПОНЕНТ ОБУЧАЮЩЕГО ПОПАПА ====================== */
+        function InstructionPopup({ open, onClose }) {
+          useEffect(() => {
+            if (open) {
+              const onKey = (e) => {
+                if (e.key === "Escape") onClose();
+              };
+              document.addEventListener("keydown", onKey);
+              document.body.style.overflow = 'hidden';
+              
+              return () => {
+                document.removeEventListener("keydown", onKey);
+                document.body.style.overflow = '';
+              };
+            }
+          }, [open, onClose]);
+        
+          if (!open) return null;
+        
+          return React.createElement("div", { 
+            className: "instruction-backdrop",
+            onClick: (e) => e.target === e.currentTarget && onClose()
+          }, 
+            React.createElement("div", {
+              className: "instruction-modal",
+              role: "dialog",
+              "aria-modal": "true",
+              "aria-label": "Инструкция по использованию песочницы"
+            },
+              React.createElement("div", { className: "instruction-header" },
+                React.createElement("h2", null, "🚀 Добро пожаловать в Песочницу Стартап-Студии!"),
+                React.createElement("button", {
+                  className: "center-modal-close",
+                  onClick: onClose,
+                  "aria-label": "Закрыть инструкцию",
+                  style: { color: "white" }
+                }, "×")
+              ),
+              React.createElement("div", { className: "instruction-body" },
+                React.createElement("div", { className: "instruction-section" },
+                  React.createElement("h3", null, "🎯 Что это такое?"),
+                  React.createElement("p", null, 
+                    "Это безопасная среда для тестирования ваших идей в режиме «одного окна». Здесь вы можете:"),
+                  React.createElement("div", { className: "instruction-features" },
+                    React.createElement("div", { className: "instruction-feature" },
+                      React.createElement("h4", null, "💡 Проверить идеи"),
+                      React.createElement("p", null, "Оценить потенциал вашей идеи до реальных инвестиций")
+                    ),
+                    React.createElement("div", { className: "instruction-feature" },
+                      React.createElement("h4", null, "📊 Получить обратную связь"),
+                      React.createElement("p", null, "Система автоматически оценит вашу идею по ключевым метрикам")
+                    ),
+                    React.createElement("div", { className: "instruction-feature" },
+                      React.createElement("h4", null, "🎪 Протестировать в безопасной среде"),
+                      React.createElement("p", null, "Экспериментируйте без риска для реального бизнеса")
+                    )
+                  )
+                ),
+        
+                React.createElement("div", { className: "instruction-section" },
+                  React.createElement("h3", null, "📈 Система метрик"),
+                  React.createElement("p", null, 
+                    "Ваша идея оценивается по четырем ключевым показателям:"),
+                  
+                  React.createElement("div", { className: "metric-explanation" },
+                    React.createElement("h4", null, 
+                      "🎯 Fit", 
+                      React.createElement("span", { className: "metric-score" }, "50%+")
+                    ),
+                    React.createElement("p", null, 
+                      "Насколько ваша идея соответствует выбранному направлению. Считается из:"),
+                    React.createElement("ul", { className: "list" },
+                      React.createElement("li", null, "• 50% - соответствие открытым кейсам"),
+                      React.createElement("li", null, "• 30% - совпадение по эффектам"),
+                      React.createElement("li", null, "• 20% - релевантность заказчику")
+                    )
+                  ),
+        
+                  React.createElement("div", { className: "metric-explanation" },
+                    React.createElement("h4", null, 
+                      "🚀 Pilot", 
+                      React.createElement("span", { className: "metric-score" }, "40%+")
+                    ),
+                    React.createElement("p", null, 
+                      "Готовность к пилотирования. Учитывает проработанность:"),
+                    React.createElement("ul", { className: "list" },
+                      React.createElement("li", null, "• Площадка для тестирования"),
+                      React.createElement("li", null, "• Источники данных"),
+                      React.createElement("li", null, "• Точки интеграции"),
+                      React.createElement("li", null, "• Юридические согласования")
+                    )
+                  ),
+        
+                  React.createElement("div", { className: "metric-explanation" },
+                    React.createElement("h4", null, 
+                      "💡 Idea", 
+                      React.createElement("span", { className: "metric-score" }, "50%+")
+                    ),
+                    React.createElement("p", null, 
+                      "Качество проработки идеи. Состоит из:"),
+                    React.createElement("ul", { className: "list" },
+                      React.createElement("li", null, "• 50% - обоснование требований"),
+                      React.createElement("li", null, "• 30% - ядро пилота"),
+                      React.createElement("li", null, "• 20% - полнота продуктового описания")
+                    )
+                  ),
+        
+                  React.createElement("div", { className: "metric-explanation" },
+                    React.createElement("h4", null, 
+                      "🏗️ Product", 
+                      React.createElement("span", { className: "metric-score" }, "100%")
+                    ),
+                    React.createElement("p", null, 
+                      "Полнота продуктового описания. Проверяет заполнение:"),
+                    React.createElement("ul", { className: "list" },
+                      React.createElement("li", null, "• Проблематика"),
+                      React.createElement("li", null, "• Тип продукта"),
+                      React.createElement("li", null, "• Техническое решение"),
+                      React.createElement("li", null, "• Бизнес-модель")
+                    )
+                  )
+                ),
+        
+                React.createElement("div", { className: "instruction-section" },
+                  React.createElement("h3", null, "🎮 Как начать?"),
+                  React.createElement("ol", { className: "list" },
+                    React.createElement("li", null, 
+                      React.createElement("strong", null, "Выберите вкладку «Проекты»")),
+                    React.createElement("li", null, 
+                      React.createElement("strong", null, "Нажмите «Добавить проект»")),
+                    React.createElement("li", null, 
+                      React.createElement("strong", null, "Пройдите 4 шага самооценки")),
+                    React.createElement("li", null, 
+                      React.createElement("strong", null, "Используйте Fit-Check для анализа")),
+                    React.createElement("li", null, 
+                      React.createElement("strong", null, "Сохраните проект когда будете готовы"))
+                  )
+                ),
+        
+                React.createElement("div", { className: "instruction-section" },
+                  React.createElement("h3", null, "💎 Критерии успеха"),
+                  React.createElement("p", null, 
+                    "Хорошая идея для инвестиций обычно имеет:"),
+                  React.createElement("ul", { className: "list" },
+                    React.createElement("li", null, "• Fit ≥ 50% - решает актуальные кейсы"),
+                    React.createElement("li", null, "• Pilot ≥ 40% - можно быстро протестировать"),
+                    React.createElement("li", null, "• Idea ≥ 50% - хорошо проработана"),
+                    React.createElement("li", null, "• Product = 100% - полное описание")
+                  )
+                )
+              ),
+              React.createElement("div", { className: "instruction-footer" },
+                React.createElement("div", { className: "small" },
+                  "💡 Эту инструкцию можно всегда открыть через кнопку «Показать инструкцию»"
+                ),
+                React.createElement("button", {
+                  className: "btn primary",
+                  onClick: onClose
+                }, "Понятно, начать!")
+              )
+            )
+          );
         }
 
         // ====================== ЗАПУСК ПРИЛОЖЕНИЯ ======================
