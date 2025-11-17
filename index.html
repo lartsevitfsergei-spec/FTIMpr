@@ -383,6 +383,89 @@
             border: 1px solid #a7f3d0;
             color: #10b981;
         }
+        /* НОВЫЕ СТИЛИ ДЛЯ ЦЕНТРАЛЬНЫХ МОДАЛЬНЫХ ОКОН */
+        .center-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.6);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            
+        }
+        .center-modal {
+            background: var(--panel);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 800px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);  
+            animation: modalAppear 0.2s ease-out;
+            
+        }
+        @keyframes modalAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+                }
+            
+        }
+        .center-modal .modal-head {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;  
+            flex-shrink: 0;
+            
+        }
+        .center-modal .modal-body {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+            max-height: 60vh;
+            
+        }
+        .center-modal .modal-foot {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-shrink: 0;
+            
+        }
+        .center-modal .modal-head h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text);
+            
+        }
+        .center-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 4px;
+            color: var(--muted);
+            border-radius: 4px;
+            
+        }
+        .center-modal-close:hover {
+            background: var(--border);
+            color: var(--text);
+            
+        }
     </style>
 </head>
 <body>
@@ -1918,7 +2001,7 @@
                 }
             };
 
-            return React.createElement(SideModal, {
+            return React.createElement(CenterModal, {
                 open,
                 onClose,
                 title: isEdit ? "Редактировать проект" : "Добавить проект",
@@ -1999,7 +2082,55 @@
             ))
             );
         }
-
+        /* ====================== КОМПОНЕНТ ЦЕНТРАЛЬНОГО МОДАЛЬНОГО ОКНА ====================== */
+        /* ====================== КОМПОНЕНТ ЦЕНТРАЛЬНОГО МОДАЛЬНОГО ОКНА ====================== */
+        function CenterModal({ open, title, onClose, headExtra, children, footLeft, footRight, ariaLabel }) {
+          useEffect(() => {
+            if (open) {
+              const onKey = (e) => {
+                if (e.key === "Escape") onClose();
+              };
+              document.addEventListener("keydown", onKey);
+              document.body.style.overflow = 'hidden';
+              
+              return () => {
+                document.removeEventListener("keydown", onKey);
+                document.body.style.overflow = '';
+              };
+            }
+          }, [open, onClose]);
+        
+          if (!open) return null;
+        
+          return React.createElement("div", { 
+            className: "center-modal-backdrop",
+            onClick: (e) => e.target === e.currentTarget && onClose()
+          }, 
+            React.createElement("div", {
+              className: "center-modal",
+              role: "dialog",
+              "aria-modal": "true",
+              "aria-label": ariaLabel || title
+            },
+              React.createElement("div", { className: "modal-head" },
+                React.createElement("h2", null, title),
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: "12px" } },
+                  headExtra,
+                  React.createElement("button", {
+                    className: "center-modal-close",
+                    onClick: onClose,
+                    "aria-label": "Закрыть"
+                  }, "×")
+                )
+              ),
+              React.createElement("div", { className: "modal-body" }, children),
+              React.createElement("div", { className: "modal-foot" },
+                React.createElement("div", null, footLeft),
+                React.createElement("div", { style: { display: "flex", gap: "8px" } }, footRight)
+              )
+            )
+          );
+        }
         /* ====================== Direction: редактор ====================== */
         function DirectionDrawer({ open, onClose, initialDirection, onSave }) {
             const [code, setCode] = useState("");
@@ -2045,7 +2176,7 @@
                 onClose();
             };
 
-            return React.createElement(SideModal, {
+            return React.createElement(CenterModal, {
                 open: open && !!initialDirection,
                 onClose,
                 title: "Редактировать направление",
@@ -2179,7 +2310,7 @@
                 onClose();
             };
 
-            return React.createElement(SideModal, {
+            return React.createElement(CenterModal, {
                 open,
                 onClose,
                 title: "Создать новое направление",
@@ -2349,7 +2480,7 @@
                 onClose();
             };
 
-            return React.createElement(SideModal, {
+            return React.createElement(CenterModal, {
                 open,
                 onClose,
                 title: isEdit ? "Редактировать проект от ФТИМ" : "Добавить проект от ФТИМ",
@@ -3310,7 +3441,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     )
                 ),
 
-                React.createElement(SideModal, {
+                React.createElement(CenterModal, {
                     open: fitOpen && !!fitItem,
                     title: "Fit-Check",
                     onClose: () => setFitOpen(false),
