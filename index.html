@@ -1244,7 +1244,8 @@
                 customer: p.customer || "",
                 directionName: p.directionName || "",
                 directionCode: p.directionCode || "",
-                targetAudience: Array.isArray(p.targetAudience) ? p.targetAudience : [],
+                targetAudience: typeof p.targetAudience === 'string' ? p.targetAudience : 
+                               Array.isArray(p.targetAudience) ? p.targetAudience.join(", ") : "",
                 effectTags: Array.isArray(p.effectTags) ? p.effectTags : [],
                 DITTags: Array.isArray(p.DITTags) ? p.DITTags : [],
                 shortDescription: p.shortDescription || "",
@@ -1915,7 +1916,7 @@
             const [customer, setCustomer] = useState("");
             const [directionName, setDirectionName] = useState("");
             const [directionCode, setDirectionCode] = useState("");
-            const [targetAudience, setTargetAudience] = useState([]);
+            const [targetAudience, setTargetAudience] = useState("");
             const [effectTags, setEffectTags] = useState([]);
             const [DITTags, setDITTags] = useState([]);
             const [shortDescription, setShortDescription] = useState("");
@@ -1980,7 +1981,7 @@
                     setCustomer(initialProject.customer || "");
                     setDirectionName(initialProject.directionName || "");
                     setDirectionCode(initialProject.directionCode || "");
-                    setTargetAudience(initialProject.targetAudience || []);
+                    setTargetAudience(Array.isArray(initialProject.targetAudience) ? initialProject.targetAudience.join(", ") : initialProject.targetAudience || "");
                     setEffectTags(initialProject.effectTags || []);
                     setDITTags(initialProject.DITTags || []);
                     setShortDescription(initialProject.shortDescription || "");
@@ -2363,11 +2364,12 @@
                                 "Целевая аудитория",
                                 React.createElement(HelperButton, { topic: "targetAudience" })
                               ),
-                              React.createElement(TagsInput, {
-                                values: targetAudience,
-                                setValues: setTargetAudience,
-                                placeholder: "Добавьте целевую аудиторию и нажмите Enter", 
-                                ariaLabel: "Целевая аудитория"
+                              React.createElement("textarea", {
+                                className: "input textarea",
+                                value: targetAudience,
+                                onChange: (e) => setTargetAudience(e.target.value),
+                                placeholder: "ЦА = Пол + Цель + Маршрут + Специфика\nПример: Женщина, едет на работу на автобусе №555 от Видного до Кунцевской, пенсионерка 72 лет без смартфона",
+                                style: { minHeight: "80px" }
                               })
                             ),
                             
