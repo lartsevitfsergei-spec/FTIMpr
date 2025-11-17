@@ -1090,16 +1090,31 @@
         }
 
         function computeReqNotesScore(project, dir) {
-            const reqTotal = dir
-                ? (dir.requirements || []).length
-                : Math.max(project.selfAssessment?.length || 0, project.selfAssessmentNotes?.length || 0);
-            if (!reqTotal || reqTotal <= 0) return 0;
-            let ok = 0;
-            for (let i = 0; i < reqTotal; i++) {
-                const note = project.selfAssessmentNotes?.[i] || "";
-                if (note && note.trim().length >= MIN_NOTE_CHARS && !isTrivialNote(note)) ok += 1;
+          // Если направление не имеет требований, возвращаем 100%
+          if (!dir?.requirements || dir.requirements.length === 0) {
+            return 100;
+          }
+        
+          const requirements = dir.requirements;
+          const selfAssessment = project.selfAssessment || [];
+          const selfNotes = project.selfAssessmentNotes || [];
+        
+          let totalScore = 0;
+        
+          for (let i = 0; i < requirements.length; i++) {
+            const isConfirmed = selfAssessment[i] === true;
+            const note = selfNotes[i] || '';
+            const hasQualityNote = note.trim().length >= MIN_NOTE_CHARS && !isTrivialNote(note);
+        
+            if (isConfirmed && hasQualityNote) {
+              totalScore += 1; // 100% за этот пункт
+            } else if (isConfirmed) {
+              totalScore += 0.5; // 50% за этот пункт
             }
-            return Math.round((ok / reqTotal) * 100);
+            // Иначе 0 - не подтверждено
+          }
+        
+          return (totalScore / requirements.length) * 100;
         }
 
         function computePilotCoreScore(project) {
@@ -1129,13 +1144,13 @@
             return Math.round((completed / fields.length) * 100);
         }
         function computeIdeaAdequacy(project, dir) {
-            const reqNotesScore = computeReqNotesScore(project, dir);
-            const pilotCoreScore = computePilotCoreScore(project);
-            const productCompletenessScore = computeProductCompleteness(project);
-            
-            // НОВАЯ ФОРМУЛА: 50% требования + 30% пилот + 20% продукт
-            const raw = 0.5 * reqNotesScore + 0.3 * pilotCoreScore + 0.2 * productCompletenessScore;
-            return Math.round(raw);
+          const reqNotesScore = computeReqNotesScore(project, dir);
+          const pilotCoreScore = computePilotCoreScore(project);
+          const productCompletenessScore = computeProductCompleteness(project);
+          
+          // ОБНОВЛЕННАЯ ФОРМУЛА: 60% требования + 25% пилот + 15% продукт
+          const raw = 0.6 * reqNotesScore + 0.25 * pilotCoreScore + 0.15 * productCompletenessScore;
+          return Math.round(raw);
         }
 
         // НОВАЯ ФУНКЦИЯ: Расчет прогресса по уровням самооценки
@@ -2135,13 +2150,27 @@
 
             // Рекомендации «Следующий шаг»
             const nextSteps = [];
-            if (!pilotSite.trim()) nextSteps.push("Назовите площадку пилота (маршрут/депо/станция)");
-            if ((pilotDataSources || []).length === 0) nextSteps.push("Добавьте 1 источник данных (например, валидаторы/CRM жалоб)");
-            if ((pilotIntegrations || []).length === 0) nextSteps.push("Добавьте 1 систему/API (например, биллинг/телеметрия)");
-            if (!allChecked) nextSteps.push("Отметьте все требования направления");
-            if (!allNotesOk) nextSteps.push("Напишите короткое обоснование (≥ 20 символов)");
-            if (computed.fit < 20) nextSteps.push("Уточните эффекты/заказчика (повысит Fit)");
-            const nextStepsUnique = Array.from(new Set(nextSteps)).slice(0, 3);
+            // НОВАЯ ПРОВЕРКА: Качество требований
+                const confirmedCount = selfChecks.filter(Boolean).length;
+                const qualityNotesCount = selfNotes.filter(note => 
+                  note && note.trim().length >= MIN_NOTE_CHARS && !isTrivialNote(note)
+                ).length;
+                
+                if (confirmedCount < reqs.length) {
+                  nextSteps.push(`Отметьте все требования направления (${confirmedCount}/${reqs.length} галочек)`);
+                }
+                
+                if (qualityNotesCount < reqs.length) {
+                  nextSteps.push(`Заполните обоснования требований (${qualityNotesCount}/${reqs.length} текстов)`);
+                }
+                
+                // СТАРЫЕ ПРОВЕРКИ (оставляем без изменений)
+                if (!pilotSite.trim()) nextSteps.push("Назовите площадку пилота (маршрут/депо/станция)");
+                if ((pilotDataSources || []).length === 0) nextSteps.push("Добавьте 1 источник данных (например, валидаторы/CRM жалоб)");
+                if ((pilotIntegrations || []).length === 0) nextSteps.push("Добавьте 1 систему/API (например, биллинг/телеметрия)");
+                if (computed.fit < 20) nextSteps.push("Уточните эффекты/заказчика (повысит Fit)");
+                
+                const nextStepsUnique = Array.from(new Set(nextSteps)).slice(0, 3);
 
             const validateBase = () => {
                 const e = {};
@@ -2445,13 +2474,19 @@
                                 reqs.length === 0 ? React.createElement("div", { className: "small" }, "Выберите направление — чек-лист появится автоматически.") :
                                 React.createElement("div", null,
                                     React.createElement("div", { className: "sa-meta" },
-                                        React.createElement("span", { className: "small" }, "Отметьте все пункты и заполните обоснования."),
-                                        React.createElement(Badge, { 
-                                            kind: reqs.length > 0 && selfChecks.filter(Boolean).length === reqs.length ? "ok" : "muted" 
-                                        }, "Отмечено ", selfChecks.filter(Boolean).length, "/", reqs.length),
-                                        React.createElement(Badge, { 
-                                            kind: notesOkFlags.every(Boolean) ? "ok" : "muted" 
-                                        }, "Обоснования ", notesOkFlags.filter(Boolean).length, "/", reqs.length)
+                                      React.createElement("span", { className: "small" }, "Отметьте галочки и заполните обоснования."),
+                                      React.createElement(Badge, { 
+                                        kind: reqs.length > 0 && selfChecks.filter(Boolean).length === reqs.length ? "ok" : "muted" 
+                                      }, "Галочки ", selfChecks.filter(Boolean).length, "/", reqs.length),
+                                      React.createElement(Badge, { 
+                                        kind: notesOkFlags.every(Boolean) ? "ok" : "muted" 
+                                      }, "Тексты ", notesOkFlags.filter(Boolean).length, "/", reqs.length),
+                                      React.createElement(Badge, { 
+                                        kind: "accent" 
+                                      }, "Качество ", Math.round(computeReqNotesScore({
+                                        selfAssessment: selfChecks,
+                                        selfAssessmentNotes: selfNotes
+                                      }, { requirements: reqs }) || 0), "%")
                                     ),
                                     React.createElement("ul", { className: "sa-list" }, reqs.map((req, idx) => {
                                         const checked = !!selfChecks[idx];
