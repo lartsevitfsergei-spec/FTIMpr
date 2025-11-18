@@ -2632,14 +2632,14 @@
                 "aria-label": "Форма проекта",
                 headExtra: React.createElement("div", { className: "chips" },
                     React.createElement(Badge, { 
-                        title: "Fit% = 50% текстовые совпадения + 30% эффекты + 20% заказчик" 
-                    }, "Fit ", computed.fit, "%"),
+                        title: "Соответствие выбранному направлению (кейсы + эффекты + заказчик)" 
+                    }, "Направление ", computed.fit, "%"),
                     React.createElement(Badge, { 
-                        title: "Pilot% = доля заполненных полей пилота" 
-                    }, "Pilot ", computed.pilot, "%"),
+                        title: "Готовность проекта к реальному тестированию" 
+                    }, "Тестирование ", computed.pilot, "%"),
                     React.createElement(Badge, { 
-                        title: "Idea% = 60% качество обоснований + 40% core пилота" 
-                    }, "Idea ", computed.idea, "%")
+                        title: "Глубина проработки идеи (требования + план + продукт)" 
+                    }, "Проработка ", computed.idea, "%")
                 ),
                 footLeft: React.createElement("div", { className: "small" },
                     "Прогресс самооценки: ", assessmentProgress.overall, "%",
@@ -3842,14 +3842,14 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                     React.createElement("span", { className: "muted" }, "Продукт:"), " ", it.productType),
                                 React.createElement("div", { className: "chips" },
                                     React.createElement(Badge, { 
-                                        title: "Fit% = 50% совпадения с кейсами + 30% эффекты + 20% заказчик" 
-                                    }, "Fit ", it.fitScore ?? 0, "%"),
+                                      title: "Соответствие выбранному направлению (кейсы + эффекты + заказчик)" 
+                                    }, "Направление ", it.fitScore ?? 0, "%"),
                                     React.createElement(Badge, { 
-                                        title: "Pilot% = доля заполненных полей пилота (site, sources, integrations, legal, resources, steps, success)" 
-                                    }, "Pilot ", it.pilotReadiness ?? 0, "%"),
+                                      title: "Готовность проекта к реальному тестированию" 
+                                    }, "Тестирование ", it.pilotReadiness ?? 0, "%"),
                                     React.createElement(Badge, { 
-                                        title: "Idea% = 60% качество обоснований + 40% core пилота" 
-                                    }, "Idea ", ideaBadgeVal, "%")
+                                      title: "Глубина проработки идеи (требования + план + продукт)" 
+                                    }, "Проработка ", ideaBadgeVal, "%")
                                 )
                             ) : isFTIMProject ? React.createElement(React.Fragment, null,
                                 React.createElement("div", { className: "small" },
@@ -3970,7 +3970,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                             })),
                                         dataset === "projects" && React.createElement("th", null, 
                                             React.createElement(SortHeader, {
-                                                label: "Fit",
+                                                label: "Направление",
                                                 sortKey: "fit",
                                                 currentKey: sortKey,
                                                 sortDir,
@@ -3978,7 +3978,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                             })),
                                         dataset === "projects" && React.createElement("th", null, 
                                             React.createElement(SortHeader, {
-                                                label: "Pilot",
+                                                label: "Тестирование",
                                                 sortKey: "pilot",
                                                 currentKey: sortKey,
                                                 sortDir,
@@ -4036,11 +4036,11 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                             : "—"
                                         ),
                                         dataset === "projects" && React.createElement("td", null, 
-                                            it.type === "project" ? 
-                                            React.createElement(Badge, null, "Fit ", it.fitScore ?? 0, "%") : "—"),
+                                          it.type === "project" ? 
+                                          React.createElement(Badge, null, "Направление ", it.fitScore ?? 0, "%") : "—"),
                                         dataset === "projects" && React.createElement("td", null, 
-                                            it.type === "project" ? 
-                                            React.createElement(Badge, null, "Pilot ", it.pilotReadiness ?? 0, "%") : "—"),
+                                          it.type === "project" ? 
+                                          React.createElement(Badge, null, "Тестирование ", it.pilotReadiness ?? 0, "%") : "—"),
                                         React.createElement("td", null,
                                             React.createElement("div", { className: "chips" },
                                                 it.type === "project" ? React.createElement(React.Fragment, null,
@@ -4088,21 +4088,21 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
 
                 React.createElement(CenterModal, {
                     open: fitOpen && !!fitItem,
-                    title: "Fit-Check",
+                    title: "Анализ соответствия",
                     onClose: () => setFitOpen(false),
                     headExtra: fitItem ? React.createElement("div", { className: "chips" },
                         React.createElement(Badge, { 
-                            title: "Fit% = 50% совпадения с кейсами + 30% эффекты + 20% заказчик" 
-                        }, "Fit ", fitItem.fitScore ?? 0, "%"),
+                            title: "Соответствие выбранному направлению (кейсы + эффекты + заказчик)" 
+                        }, "Направление ", fitItem.fitScore ?? 0, "%"),
                         React.createElement(Badge, { 
-                            title: "Pilot% = доля заполненных полей пилота" 
-                        }, "Pilot ", fitItem.pilotReadiness ?? 0, "%"),
+                            title: "Готовность проекта к реальному тестированию" 
+                        }, "Тестирование ", fitItem.pilotReadiness ?? 0, "%"),
                         React.createElement(Badge, { 
-                            title: "Idea% = 50% требования + 30% пилот + 20% продукт" 
-                        }, "Idea ", computeIdeaAdequacy(fitItem, directions.find((d) => d.name === fitItem.directionName))),
+                            title: "Глубина проработки идеи (требования + план + продукт)" 
+                        }, "Проработка ", computeIdeaAdequacy(fitItem, directions.find((d) => d.name === fitItem.directionName))),
                         React.createElement(Badge, { 
-                            title: "Product% = полнота заполнения продуктовых полей (проблема, тип продукта, решение, бизнес-модель)" 
-                        }, "Product ", computeProductCompleteness(fitItem), "%")
+                            title: "Полнота продуктового описания" 
+                        }, "Продукт ", computeProductCompleteness(fitItem), "%")
                     ) : null,
                     footRight: React.createElement("button", {
                         className: "btn primary",
@@ -4290,7 +4290,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                   
                   React.createElement("div", { className: "metric-explanation" },
                     React.createElement("h4", null, 
-                      "🎯 Fit", 
+                      "🎯 Соответствие направлению", 
                       React.createElement("span", { className: "metric-score" }, "50%+")
                     ),
                     React.createElement("p", null, 
@@ -4304,7 +4304,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         
                   React.createElement("div", { className: "metric-explanation" },
                     React.createElement("h4", null, 
-                      "🚀 Pilot", 
+                      "🚀 Готовность к тестированию", 
                       React.createElement("span", { className: "metric-score" }, "40%+")
                     ),
                     React.createElement("p", null, 
@@ -4319,7 +4319,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         
                   React.createElement("div", { className: "metric-explanation" },
                     React.createElement("h4", null, 
-                      "💡 Idea", 
+                      "💡 Проработка идеи", 
                       React.createElement("span", { className: "metric-score" }, "50%+")
                     ),
                     React.createElement("p", null, 
@@ -4333,7 +4333,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         
                   React.createElement("div", { className: "metric-explanation" },
                     React.createElement("h4", null, 
-                      "🏗️ Product", 
+                      "🏗 Продукт", 
                       React.createElement("span", { className: "metric-score" }, "100%")
                     ),
                     React.createElement("p", null, 
