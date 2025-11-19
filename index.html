@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Карта направлений — дашборд</title>
+    <title>Песочница Стартап-студии</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -1094,6 +1094,18 @@
 
         /* ====================== Константы и справочники ====================== */
         const CUSTOMERS = ["Метро", "МГТ"];
+        
+        /* ====================== Система пользователей ====================== */
+        const USER_ROLES = {
+          FOUNDATION: "foundation",      // Сотрудник Фонда ТИМ
+          PARTICIPANT: "participant"     // Участник СтСт
+        };
+        
+        const FOUNDATION_PASSWORD = "Я люблю ФТИМ";
+        
+        // Ключи для хранения в LocalStorage
+        const LS_USER_ROLE = "mvb_user_role";
+        const LS_USER_NAME = "mvb_user_name";
         
         // Новые константы для бизнес-модели
         const BUSINESS_MODELS = ["Коммерциализация", "Оптимизация"];
@@ -3421,6 +3433,97 @@
                 "Новое направление будет доступно для выбора в проектах и появится в общем списке направлений."
             ));
         }
+        
+        /* ====================== Компонент входа в систему ====================== */
+        function LoginModal({ open, onClose, onLogin }) {
+            const [password, setPassword] = useState("");
+            const [name, setName] = useState("");
+            const [error, setError] = useState("");
+        
+            const handleLogin = () => {
+                if (password === FOUNDATION_PASSWORD) {
+                    onLogin(USER_ROLES.FOUNDATION, name || "Сотрудник ФТИМ");
+                    setError("");
+                } else if (password.trim() !== "") {
+                    setError("Неверный пароль для сотрудника ФТИМ");
+                } else {
+                    // Вход как участник без пароля
+                    onLogin(USER_ROLES.PARTICIPANT, name || "Участник СтСт");
+                    setError("");
+                }
+            };
+        
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter') {
+                    handleLogin();
+                }
+            };
+        
+            return React.createElement(CenterModal, {
+                open,
+                onClose,
+                title: "🔐 Вход в систему",
+                "aria-label": "Форма входа в систему",
+                footRight: React.createElement(React.Fragment, null,
+                    React.createElement("button", { 
+                        className: "btn", 
+                        onClick: onClose 
+                    }, "Отмена"),
+                    React.createElement("button", { 
+                        className: "btn primary", 
+                        onClick: handleLogin 
+                    }, "Войти")
+                )
+            }, 
+                React.createElement("div", { className: "field-group" },
+                    React.createElement("div", { className: "label" }, "👤 Ваше имя"),
+                    React.createElement("input", {
+                        className: "input",
+                        value: name,
+                        onChange: (e) => setName(e.target.value),
+                        onKeyPress: handleKeyPress,
+                        placeholder: "Представьтесь, пожалуйста"
+                    })
+                ),
+                React.createElement("div", { className: "field-group" },
+                    React.createElement("div", { className: "label" }, 
+                        "🔒 Пароль для сотрудников ФТИМ",
+                        React.createElement("div", { className: "small" }, 
+                            "Оставьте пустым для входа как участник СтСт"
+                        )
+                    ),
+                    React.createElement("input", {
+                        type: "password",
+                        className: "input",
+                        value: password,
+                        onChange: (e) => setPassword(e.target.value),
+                        onKeyPress: handleKeyPress,
+                        placeholder: "Только для сотрудников ФТИМ"
+                    })
+                ),
+                error && React.createElement("div", { 
+                    className: "small", 
+                    style: { color: "var(--red)", marginTop: 8 } 
+                }, error),
+                
+                React.createElement("hr", { className: "sep" }),
+                
+                React.createElement("div", { className: "small", style: { marginTop: 16 } },
+                    React.createElement("strong", null, "📋 Доступные роли:"),
+                    React.createElement("ul", { className: "list", style: { marginTop: 8 } },
+                        React.createElement("li", null, 
+                            "🎓 Участник СтСт - добавление и редактирование своих проектов"
+                        ),
+                        React.createElement("li", null, 
+                            "🏢 Сотрудник ФТИМ - полный доступ ко всем функциям"
+                        )
+                    )
+                ),
+                React.createElement("div", { className: "small", style: { marginTop: 12, color: "var(--muted)" } },
+                    "💡 Подсказка: для входа как участник просто введите имя и нажмите 'Войти'"
+                )
+            );
+        }
 
         /* ====================== Проекты от ФТИМ ====================== */
         function FTIMProjectDrawer({ open, onClose, directions, initialProject, onSave }) {
@@ -3576,6 +3679,18 @@
             const [directions, setDirections] = useState(loadDirections());
             const [projects, setProjects] = useState(loadProjects());
             const [ftimProjects, setFtimProjects] = useState(loadFTIMProjects());
+            
+            /* ====================== СОСТОЯНИЯ ПОЛЬЗОВАТЕЛЕЙ ====================== */
+            const [currentUser, setCurrentUser] = useState(() => {
+                try {
+                    const role = localStorage.getItem(LS_USER_ROLE);
+                    const name = localStorage.getItem(LS_USER_NAME);
+                    return role ? { role, name } : null;
+                } catch {
+                    return null;
+                }
+            });
+            const [showLogin, setShowLogin] = useState(!currentUser);
 
             const [dataset, setDataset] = useState("directions");
             const [view, setView] = useState("cards");
@@ -3615,8 +3730,29 @@
                 } catch {}
                 setShowInstruction(false);
             };
-             const [manualInstructionOpen, setManualInstructionOpen] = useState(false);
-
+            const [manualInstructionOpen, setManualInstructionOpen] = useState(false);
+            
+            /* ====================== ФУНКЦИИ ПОЛЬЗОВАТЕЛЕЙ ====================== */
+            const handleLogin = (role, name) => {
+                const user = { role, name };
+                setCurrentUser(user);
+                localStorage.setItem(LS_USER_ROLE, role);
+                localStorage.setItem(LS_USER_NAME, name);
+                setShowLogin(false);
+            };
+        
+            const handleLogout = () => {
+                setCurrentUser(null);
+                localStorage.removeItem(LS_USER_ROLE);
+                localStorage.removeItem(LS_USER_NAME);
+                setShowLogin(true);
+            };
+        
+            // Проверки прав доступа
+            const canEditDirections = currentUser?.role === USER_ROLES.FOUNDATION;
+            const canEditFTIMProjects = currentUser?.role === USER_ROLES.FOUNDATION;
+            const canEditProjects = !!currentUser; // Любой авторизованный пользователь может редактировать проекты
+            
             const directionNamesAll = useMemo(() => directions.map((d) => d.name), [directions]);
 
             const unified = useMemo(() => {
@@ -3764,6 +3900,10 @@
             };
 
             const deleteFTIMProject = (id) => {
+                if (!canEditFTIMProjects) {
+                    alert("❌ Недостаточно прав для удаления проектов ФТИМ");
+                    return;
+                }
                 if (confirm("Удалить проект от ФТИМ?")) {
                     setFtimProjects((prev) => {
                         const next = prev.filter((p) => p.id !== id);
@@ -3774,6 +3914,10 @@
             };
 
             const saveDirection = (updated) => {
+                if (!canEditDirections) {
+                    alert("❌ Недостаточно прав для редактирования направлений");
+                    return;
+                }
                 setDirections((prev) => {
                     const next = prev.map((d) => (d.code === updated.code ? updated : d));
                     saveDirections(next);
@@ -3782,6 +3926,10 @@
             };
 
             const createDirection = (newDirection) => {
+                if (!canEditDirections) {
+                    alert("❌ Недостаточно прав для создания направлений");
+                    return;
+                }
                 const exists = directions.find(d => d.code === newDirection.code);
                 if (exists) {
                     alert('Направление с таким кодом уже существует!');
@@ -3967,10 +4115,24 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     React.createElement("div", { className: "title" }, "Карта направлений — дашборд"),
                     React.createElement("div", { className: "spacer" }),
                     React.createElement("div", { className: "status" },
-                        React.createElement("span", { 
-                            className: "small", 
-                            title: "Данные сохраняются локально (LocalStorage)." 
-                        }, "Сессия сохраняется")
+                        currentUser ? 
+                            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12 } },
+                                React.createElement("span", { className: "small" }, 
+                                    `👋 ${currentUser.name} (${currentUser.role === USER_ROLES.FOUNDATION ? "Сотрудник ФТИМ" : "Участник СтСт"})`
+                                ),
+                                React.createElement("button", {
+                                    className: "btn ghost",
+                                    onClick: handleLogout,
+                                    "aria-label": "Выйти",
+                                    style: { fontSize: "12px", padding: "4px 8px" }
+                                }, "Выйти")
+                            ) :
+                            React.createElement("button", {
+                                className: "btn primary",
+                                onClick: () => setShowLogin(true),
+                                "aria-label": "Войти в систему",
+                                style: { fontSize: "12px", padding: "4px 8px" }
+                            }, "Войти в систему")
                     )
                 ),
 
@@ -4122,17 +4284,18 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         })),
                         
                         // КОНТЕКСТНЫЕ КНОПКИ ДОБАВЛЕНИЯ
-                        dataset === "directions" && React.createElement("button", {
+                        // КОНТЕКСТНЫЕ КНОПКИ ДОБАВЛЕНИЯ (с проверкой прав)
+                        dataset === "directions" && canEditDirections && React.createElement("button", {
                             className: "btn primary",
                             onClick: onOpenCreateDirection,
                             "aria-label": "Создать направление"
                         }, "Создать направление"),
-                        dataset === "ftimProjects" && React.createElement("button", {
+                        dataset === "ftimProjects" && canEditFTIMProjects && React.createElement("button", {
                             className: "btn primary",
                             onClick: onOpenAddFTIMProject,
                             "aria-label": "Добавить проект от ФТИМ"
                         }, "Добавить проект"),
-                        dataset === "projects" && React.createElement("button", {
+                        dataset === "projects" && canEditProjects && React.createElement("button", {
                             className: "btn primary",
                             onClick: onOpenAddProject,
                             "aria-label": "Добавить проект"
@@ -4285,22 +4448,31 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                         onClick: () => onEditProject(it),
                                         "aria-label": "Редактировать проект"
                                     }, "Редактировать")
-                                ) : isFTIMProject ? React.createElement(React.Fragment, null,
-                                    React.createElement("button", {
-                                        className: "btn",
-                                        onClick: () => deleteFTIMProject(it.id),
-                                        "aria-label": "Удалить проект"
-                                    }, "Удалить"),
+                                ) : isFTIMProject ? (canEditFTIMProjects ? 
+                                    React.createElement(React.Fragment, null,
+                                        React.createElement("button", {
+                                            className: "btn",
+                                            onClick: () => deleteFTIMProject(it.id),
+                                            "aria-label": "Удалить проект"
+                                        }, "Удалить"),
+                                        React.createElement("button", {
+                                            className: "btn primary",
+                                            onClick: () => onEditFTIMProject(it),
+                                            "aria-label": "Редактировать проект"
+                                        }, "Редактировать")
+                                    ) :
+                                    React.createElement("span", { className: "small" }, 
+                                        "🏢 Проект Фонда ТИМ"
+                                    )
+                                ) : canEditDirections ? 
                                     React.createElement("button", {
                                         className: "btn primary",
-                                        onClick: () => onEditFTIMProject(it),
-                                        "aria-label": "Редактировать проект"
-                                    }, "Редактировать")
-                                ) : React.createElement("button", {
-                                    className: "btn primary",
-                                    onClick: () => onEditDirection(it),
-                                    "aria-label": "Редактировать направление"
-                                }, "Редактировать направление")
+                                        onClick: () => onEditDirection(it),
+                                        "aria-label": "Редактировать направление"
+                                    }, "Редактировать направление") :
+                                    React.createElement("span", { className: "small" }, 
+                                        "📖 Только для просмотра"
+                                )
                             )
                         ));
                     }),
@@ -4370,7 +4542,9 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                 sortDir,
                                                 onSort
                                             })),
-                                        React.createElement("th", null, "Действия")
+                                        React.createElement("th", null, 
+                                            (canEditDirections || canEditFTIMProjects) ? "Действия" : "Статус"
+                                        )
                                     )
                                 ),
                                 React.createElement("tbody", null,
@@ -4440,22 +4614,31 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                         onClick: () => onEditProject(it),
                                                         "aria-label": "Редактировать проект"
                                                     }, "Редактировать")
-                                                ) : it.type === "ftimProject" ? React.createElement(React.Fragment, null,
-                                                    React.createElement("button", {
-                                                        className: "btn",
-                                                        onClick: () => deleteFTIMProject(it.id),
-                                                        "aria-label": "Удалить проект"
-                                                    }, "Удалить"),
+                                                ) : it.type === "ftimProject" ? (canEditFTIMProjects ? 
+                                                    React.createElement(React.Fragment, null,
+                                                        React.createElement("button", {
+                                                            className: "btn",
+                                                            onClick: () => deleteFTIMProject(it.id),
+                                                            "aria-label": "Удалить проект"
+                                                        }, "Удалить"),
+                                                        React.createElement("button", {
+                                                            className: "btn primary",
+                                                            onClick: () => onEditFTIMProject(it),
+                                                            "aria-label": "Редактировать проект"
+                                                        }, "Редактировать")
+                                                    ) :
+                                                    React.createElement("span", { className: "small" }, 
+                                                        "Проект Фонда ТИМ"
+                                                    )    
+                                                ) : canEditDirections ? 
                                                     React.createElement("button", {
                                                         className: "btn primary",
-                                                        onClick: () => onEditFTIMProject(it),
-                                                        "aria-label": "Редактировать проект"
-                                                    }, "Редактировать")
-                                                ) : React.createElement("button", {
-                                                    className: "btn primary",
-                                                    onClick: () => onEditDirection(it),
-                                                    "aria-label": "Редактировать"
-                                                }, "Редактировать")
+                                                        onClick: () => onEditDirection(it),
+                                                        "aria-label": "Редактировать"
+                                                    }, "Редактировать") :
+                                                    React.createElement("span", { className: "small" }, 
+                                                        "Только просмотр"
+                                                )        
                                             )
                                         ))
                                     ),
@@ -4527,7 +4710,13 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         }
                         setManualInstructionOpen(false);
                     }
-                })
+                }),
+                // Добавляем модальное окно входа
+                React.createElement(LoginModal, {
+                    open: showLogin,
+                    onClose: () => setShowLogin(false),
+                    onLogin: handleLogin
+                })    
             );
         }
                 /* ====================== КОМПОНЕНТ ОБУЧАЮЩЕГО ПОПАПА ====================== */
