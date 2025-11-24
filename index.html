@@ -5011,7 +5011,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     console.log("💾 Сохраняем проекты в облако...");
                     
                     const response = await fetch(`${this.baseURL}/projects`, {
-                        method: 'PUT', // ВАЖНО: ИСПОЛЬЗУЕМ PUT вместо POST
+                        method: 'PUT',
                         mode: 'cors',
                         headers: {
                             'Content-Type': 'application/json',
@@ -5040,7 +5040,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     console.log("💾 Сохраняем направления в облако...");
                     
                     const response = await fetch(`${this.baseURL}/directions`, {
-                        method: 'PUT', // ВАЖНО: ИСПОЛЬЗУЕМ PUT вместо POST
+                        method: 'PUT',
                         mode: 'cors',
                         headers: {
                             'Content-Type': 'application/json',
@@ -5068,7 +5068,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     console.log("💾 Сохраняем проекты Фонда в облако...");
                     
                     const response = await fetch(`${this.baseURL}/ftim-projects`, {
-                        method: 'PUT', // ВАЖНО: ИСПОЛЬЗУЕМ PUT вместо POST
+                        method: 'PUT',
                         mode: 'cors',
                         headers: {
                             'Content-Type': 'application/json',
