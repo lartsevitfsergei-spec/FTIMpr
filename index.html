@@ -4884,23 +4884,45 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         }
         /* ====================== МОДУЛЬ ОБЛАЧНОГО ХРАНИЛИЩА С API GATEWAY ====================== */
         const CloudStorage = {
-            baseURL: "https://d5dj84fvqbntrqp4bgf7.apigw.yandexcloud.net",
+            baseURL: "https://d5dj84fvqbntrqp4bgf7.y1haggxy.apigw.yandexcloud.net",
             
             async loadAllData() {
                 try {
                     console.log("🔄 Пробуем загрузить данные из облака...");
+                    console.log("🌐 Используем URL:", this.baseURL);
                     
-                    const [projects, directions, ftimProjects] = await Promise.all([
-                        fetch(`${this.baseURL}/projects`).then(r => r.ok ? r.json() : []),
-                        fetch(`${this.baseURL}/directions`).then(r => r.ok ? r.json() : []),
-                        fetch(`${this.baseURL}/ftim-projects`).then(r => r.ok ? r.json() : [])
+                    const [projectsResponse, directionsResponse, ftimProjectsResponse] = await Promise.all([
+                        fetch(`${this.baseURL}/projects`),
+                        fetch(`${this.baseURL}/directions`),
+                        fetch(`${this.baseURL}/ftim-projects`)
                     ]);
                     
+                    console.log("📊 Статусы ответов:", {
+                        projects: projectsResponse.status,
+                        directions: directionsResponse.status,
+                        ftimProjects: ftimProjectsResponse.status
+                    });
+                    
+                    if (!projectsResponse.ok) throw new Error(`Projects: ${projectsResponse.status}`);
+                    if (!directionsResponse.ok) throw new Error(`Directions: ${directionsResponse.status}`);
+                    if (!ftimProjectsResponse.ok) throw new Error(`FTIM Projects: ${ftimProjectsResponse.status}`);
+                    
+                    const projects = await projectsResponse.json();
+                    const directions = await directionsResponse.json();
+                    const ftimProjects = await ftimProjectsResponse.json();
+                    
                     console.log("✅ Данные из облака загружены!");
+                    console.log("📦 Получено:", {
+                        projects: projects.length,
+                        directions: directions.length,
+                        ftimProjects: ftimProjects.length
+                    });
+                    
                     return { projects, directions, ftimProjects };
                     
                 } catch (error) {
-                    console.log("❌ Не удалось загрузить из облака, используем локальные данные");
+                    console.log("❌ Не удалось загрузить из облака:", error.message);
+                    console.log("🔄 Используем локальные данные");
                     return {
                         projects: loadProjects(),
                         directions: loadDirections(),
@@ -4919,6 +4941,8 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         },
                         body: JSON.stringify({ projects })
                     });
+                    
+                    console.log("📤 Статус сохранения проектов:", response.status);
                     
                     if (response.ok) {
                         console.log("✅ Проекты сохранены в облако!");
@@ -4945,6 +4969,8 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         body: JSON.stringify({ directions })
                     });
                     
+                    console.log("📤 Статус сохранения направлений:", response.status);
+                    
                     if (response.ok) {
                         console.log("✅ Направления сохранены в облако!");
                         return true;
@@ -4969,6 +4995,8 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         },
                         body: JSON.stringify({ ftimProjects })
                     });
+                    
+                    console.log("📤 Статус сохранения проектов Фонда:", response.status);
                     
                     if (response.ok) {
                         console.log("✅ Проекты Фонда сохранены в облако!");
@@ -5013,6 +5041,15 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         
         function DirectionsDashboardFixedWithCloud() {
             const [isLoading, setIsLoading] = useState(true);
+            // Таймаут для безопасности - если загрузка зависла
+            useEffect(() => {
+                const timeoutId = setTimeout(() => {
+                    console.warn("⚠️ Таймаут загрузки, принудительно показываем приложение");
+                    setIsLoading(false);
+                }, 10000); // 10 секунд
+                
+                return () => clearTimeout(timeoutId);
+            }, []);
             
             useEffect(() => {
                 loadCloudData();
@@ -5020,14 +5057,23 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
             
             async function loadCloudData() {
                 setIsLoading(true);
-                const cloudData = await SimpleCloudStorage.loadAllData();
-                
-                // Сохраняем облачные данные в localStorage
-                saveProjects(cloudData.projects);
-                saveDirections(cloudData.directions);
-                saveFTIMProjects(cloudData.ftimProjects);
-                
-                setIsLoading(false);
+                try {
+                    console.log("🌐 Начинаем загрузку данных...");
+                    const cloudData = await CloudStorage.loadAllData();
+                    
+                    console.log("💾 Сохраняем данные в localStorage...");
+                    // Сохраняем облачные данные в localStorage
+                    saveProjects(cloudData.projects);
+                    saveDirections(cloudData.directions);
+                    saveFTIMProjects(cloudData.ftimProjects);
+                    
+                    console.log("🎉 Все данные успешно загружены и сохранены!");
+                } catch (error) {
+                    console.error("❌ Критическая ошибка при загрузке:", error);
+                    console.log("🔄 Используем локальные данные...");
+                } finally {
+                    setIsLoading(false);
+                }
             }
             
             if (isLoading) {
