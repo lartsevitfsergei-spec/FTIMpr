@@ -111,6 +111,38 @@
         @media (min-width: 900px) {
           .toolbar { grid-template-columns: 1fr auto; align-items: center; }
         }
+        React.createElement("div", { 
+            className: "status-panel",
+            style: { 
+                background: error ? "#fef2f2" : "#f0fdf4",
+                borderColor: error ? "#fecaca" : "#bbf7d0"
+            }
+        },
+            React.createElement("div", { className: "status-item" },
+                React.createElement("span", { className: "small" }, "🔄 Синхронизация:"),
+                React.createElement("span", { 
+                    className: "status-count",
+                    style: { background: error ? "#ef4444" : "#10b981" }
+                }, error ? "Ошибка" : "Активна")
+            ),
+            React.createElement("div", { className: "status-item" },
+                React.createElement("span", { className: "small" }, "Обновлено:"),
+                React.createElement("span", { className: "status-count" }, 
+                    lastUpdate.toLocaleTimeString())
+            ),
+            React.createElement("div", { className: "spacer" }),
+            error && React.createElement("div", { className: "status-item" },
+                React.createElement("span", { 
+                    className: "small", 
+                    style: { color: "#ef4444" } 
+                }, "Ошибка связи с облаком")
+            ),
+            React.createElement("button", {
+                className: "btn ghost",
+                onClick: onDataRefresh,
+                style: { fontSize: "12px" }
+            }, "Обновить данные")
+        ),
         .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: start; }
         .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 
@@ -3675,10 +3707,21 @@
         }
 
         /* ====================== Главный компонент ====================== */
-        function DirectionsDashboardFixed() {
-            const [directions, setDirections] = useState(loadDirections());
-            const [projects, setProjects] = useState(loadProjects());
-            const [ftimProjects, setFtimProjects] = useState(loadFTIMProjects());
+        function DirectionsDashboardFixed({ cloudData, onDataRefresh }) {
+            const [directions, setDirections] = useState(cloudData ? cloudData.directions : loadDirections());
+            const [projects, setProjects] = useState(cloudData ? cloudData.projects : loadProjects());
+            const [ftimProjects, setFtimProjects] = useState(cloudData ? cloudData.ftimProjects : loadFTIMProjects());
+            const [lastUpdate, setLastUpdate] = useState(new Date());
+        
+            // Обновляем состояние при изменении cloudData
+            useEffect(() => {
+                if (cloudData) {
+                    setDirections(cloudData.directions);
+                    setProjects(cloudData.projects);
+                    setFtimProjects(cloudData.ftimProjects);
+                    setLastUpdate(new Date());
+                }
+            }, [cloudData]);
             
             /* ====================== СОСТОЯНИЯ ПОЛЬЗОВАТЕЛЕЙ ====================== */
             const [currentUser, setCurrentUser] = useState(() => {
@@ -5040,42 +5083,106 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         const OriginalDashboard = DirectionsDashboardFixed;
         
         function DirectionsDashboardFixedWithCloud() {
+            const [cloudData, setCloudData] = useState(null);
             const [isLoading, setIsLoading] = useState(true);
-            // Таймаут для безопасности - если загрузка зависла
-            useEffect(() => {
-                const timeoutId = setTimeout(() => {
-                    console.warn("⚠️ Таймаут загрузки, принудительно показываем приложение");
-                    setIsLoading(false);
-                }, 10000); // 10 секунд
-                
-                return () => clearTimeout(timeoutId);
-            }, []);
-            
-            useEffect(() => {
-                loadCloudData();
-            }, []);
-            
-            async function loadCloudData() {
+            const [error, setError] = useState(null);
+        
+            // Функция загрузки данных
+            const loadCloudData = async () => {
                 setIsLoading(true);
+                setError(null);
                 try {
-                    console.log("🌐 Начинаем загрузку данных...");
-                    const cloudData = await CloudStorage.loadAllData();
+                    console.log("🌐 Пробуем загрузить данные из облака...");
                     
-                    console.log("💾 Сохраняем данные в localStorage...");
-                    // Сохраняем облачные данные в localStorage
-                    saveProjects(cloudData.projects);
-                    saveDirections(cloudData.directions);
-                    saveFTIMProjects(cloudData.ftimProjects);
+                    // Пробуем загрузить из облака
+                    const response = await fetch("https://d5dj84fvqbntrqp4bgf7.y1haggxy.apigw.yandexcloud.net/projects");
+                    if (!response.ok) {
+                        throw new Error(`Ошибка HTTP: ${response.status}`);
+                    }
                     
-                    console.log("🎉 Все данные успешно загружены и сохранены!");
-                } catch (error) {
-                    console.error("❌ Критическая ошибка при загрузке:", error);
-                    console.log("🔄 Используем локальные данные...");
+                    const projects = await response.json();
+                    console.log("✅ Проекты из облака:", projects);
+                    
+                    // Для простоты пока используем только проекты
+                    setCloudData({
+                        projects: projects,
+                        directions: loadDirections(), // направления берем локальные
+                        ftimProjects: loadFTIMProjects() // проекты Фонда берем локальные
+                    });
+                    
+                } catch (err) {
+                    console.error("❌ Ошибка загрузки из облака:", err);
+                    setError(err.message);
+                    // Используем локальные данные как запасной вариант
+                    setCloudData({
+                        projects: loadProjects(),
+                        directions: loadDirections(),
+                        ftimProjects: loadFTIMProjects()
+                    });
                 } finally {
                     setIsLoading(false);
                 }
-            }
-            
+            };
+        
+            // Функция сохранения проекта
+            const saveProjectToCloud = async (project) => {
+                try {
+                    console.log("💾 Сохраняем проект в облако...", project);
+                    
+                    const response = await fetch("https://d5dj84fvqbntrqp4bgf7.y1haggxy.apigw.yandexcloud.net/projects", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(project)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Ошибка сохранения: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    console.log("✅ Проект сохранен в облако:", result);
+                    return true;
+                    
+                } catch (err) {
+                    console.error("❌ Ошибка сохранения в облако:", err);
+                    return false;
+                }
+            };
+        
+            // Загружаем данные при монтировании
+            useEffect(() => {
+                loadCloudData();
+                
+                // Обновляем данные каждые 30 секунд
+                const interval = setInterval(loadCloudData, 30000);
+                return () => clearInterval(interval);
+            }, []);
+        
+            // Перехватываем сохранение проектов
+            useEffect(() => {
+                const originalSaveProjects = window.saveProjects;
+                window.saveProjects = function(projects) {
+                    console.log("💾 Сохраняем проекты...");
+                    
+                    // Локальное сохранение
+                    originalSaveProjects(projects);
+                    
+                    // Сохраняем каждый новый проект в облако
+                    projects.forEach(project => {
+                        // Проверяем, новый ли это проект (нет id в облачных данных)
+                        if (cloudData && !cloudData.projects.find(p => p.id === project.id)) {
+                            saveProjectToCloud(project);
+                        }
+                    });
+                };
+                
+                return () => {
+                    window.saveProjects = originalSaveProjects;
+                };
+            }, [cloudData]);
+        
             if (isLoading) {
                 return React.createElement("div", { 
                     style: { 
@@ -5091,12 +5198,15 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     } 
                 }, 
                     React.createElement("div", { style: { fontSize: "24px" } }, "🔄"),
-                    React.createElement("div", { style: { fontWeight: "600" } }, "Загружаем данные из облака..."),
+                    React.createElement("div", { style: { fontWeight: "600" } }, "Загружаем данные..."),
                     React.createElement("div", { className: "small" }, "Пожалуйста, подождите")
                 );
             }
-            
-            return React.createElement(OriginalDashboard);
+        
+            return React.createElement(DirectionsDashboardFixed, { 
+                cloudData,
+                onDataRefresh: loadCloudData 
+            });
         }
         // ====================== ЗАПУСК ПРИЛОЖЕНИЯ ======================
         const root = ReactDOM.createRoot(document.getElementById('root'));
