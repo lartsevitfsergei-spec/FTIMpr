@@ -4937,157 +4937,168 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
           );
         }
         /* ====================== МОДУЛЬ ОБЛАЧНОГО ХРАНИЛИЩА С API GATEWAY ====================== */
-        const CloudStorage = {
-            baseURL: "https://d5dj84fvqbntrqp4bgf7.y1haggxy.apigw.yandexcloud.net",
-            async testAPI() {
-                try {
-                    console.log("🧪 Тестируем подключение к API...");
-                    
-                    const response = await fetch(`${this.baseURL}/projects`, {
-                        method: 'GET',
-                        mode: 'cors',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                    
-                    console.log("✅ API доступен, статус:", response.status);
-                    return response.ok;
-                    
-                } catch (error) {
-                    console.error("❌ API недоступен:", error);
-                    return false;
-                }
-            },
-            async loadAllData() {
-                try {
-                    console.log("🌐 Загружаем данные из облака...");
-                    
-                    const [projectsResponse, directionsResponse, ftimProjectsResponse] = await Promise.all([
-                        fetch(`${this.baseURL}/projects`, { 
-                            method: 'GET',
-                            mode: 'cors',
-                            headers: { 'Content-Type': 'application/json' }
-                        }),
-                        fetch(`${this.baseURL}/directions`, { 
-                            method: 'GET',
-                            mode: 'cors', 
-                            headers: { 'Content-Type': 'application/json' }
-                        }),
-                        fetch(`${this.baseURL}/ftim-projects`, { 
-                            method: 'GET',
-                            mode: 'cors',
-                            headers: { 'Content-Type': 'application/json' }
-                        })
-                    ]);
-                    
-                    console.log("📊 Статусы ответов:", {
-                        projects: projectsResponse.status,
-                        directions: directionsResponse.status,
-                        ftimProjects: ftimProjectsResponse.status
-                    });
-                    
-                    if (!projectsResponse.ok) throw new Error(`Projects: ${projectsResponse.status}`);
-                    if (!directionsResponse.ok) throw new Error(`Directions: ${directionsResponse.status}`);
-                    if (!ftimProjectsResponse.ok) throw new Error(`FTIM Projects: ${ftimProjectsResponse.status}`);
-                    
-                    const projects = await projectsResponse.json();
-                    const directions = await directionsResponse.json();
-                    const ftimProjects = await ftimProjectsResponse.json();
-                    
-                    console.log("✅ Данные из облака загружены!");
-                    return { projects, directions, ftimProjects };
-                    
-                } catch (error) {
-                    console.error("❌ Ошибка загрузки из облака:", error);
-                    throw error;
-                }
-            },
+    const CloudStorage = {
+        baseURL: "https://d5dj84fvqbntrqp4bgf7.y1haggxy.apigw.yandexcloud.net",
         
-            async saveProjects(projects) {
-                try {
-                    console.log("💾 Сохраняем проекты в облако...", projects);
-                    
-                    const response = await fetch(`${this.baseURL}/projects`, {
-                        method: 'POST', // Или 'PUT' в зависимости от вашего API
-                        mode: 'cors',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ projects })
-                    });
-                    
-                    console.log("📤 Ответ сервера:", response.status, response.statusText);
-                    
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        async testAPI() {
+            try {
+                console.log("🧪 Тестируем подключение к API...");
+                
+                // Добавляем режим 'cors' и обработку ошибок
+                const response = await fetch(`${this.baseURL}/projects`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     }
-                    
-                    const result = await response.json();
-                    console.log("✅ Проекты сохранены в облако:", result);
-                    return true;
-                    
-                } catch (error) {
-                    console.error("❌ Ошибка сохранения проектов:", error);
-                    return false;
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-            },
-        
-            async saveDirections(directions) {
-                try {
-                    console.log("💾 Сохраняем направления в облако...");
-                    
-                    const response = await fetch(`${this.baseURL}/directions`, {
-                        method: 'POST',
-                        mode: 'cors',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ directions })
-                    });
-                    
-                    console.log("📤 Ответ сервера:", response.status);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-                    
-                    console.log("✅ Направления сохранены в облако");
-                    return true;
-                    
-                } catch (error) {
-                    console.error("❌ Ошибка сохранения направлений:", error);
-                    return false;
-                }
-            },
-        
-            async saveFTIMProjects(ftimProjects) {
-                try {
-                    console.log("💾 Сохраняем проекты Фонда в облако...");
-                    
-                    const response = await fetch(`${this.baseURL}/ftim-projects`, {
-                        method: 'POST',
-                        mode: 'cors',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ ftimProjects })
-                    });
-                    
-                    console.log("📤 Ответ сервера:", response.status);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-                    
-                    console.log("✅ Проекты Фонда сохранены в облако");
-                    return true;
-                    
-                } catch (error) {
-                    console.error("❌ Ошибка сохранения проектов Фонда:", error);
-                    return false;
-                }
+                
+                console.log("✅ API доступен, статус:", response.status);
+                return true;
+                
+            } catch (error) {
+                console.error("❌ API недоступен:", error);
+                // Возвращаем false вместо выброса ошибки, чтобы приложение продолжало работать
+                return false;
             }
-        };
+        },
+    
+        async loadAllData() {
+            try {
+                console.log("🌐 Загружаем данные из облака...");
+                
+                // Пробуем загрузить только проекты для начала
+                const projectsResponse = await fetch(`${this.baseURL}/projects`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                console.log("📊 Статус ответа projects:", projectsResponse.status);
+                
+                if (!projectsResponse.ok) {
+                    throw new Error(`Projects: ${projectsResponse.status} ${projectsResponse.statusText}`);
+                }
+                
+                const projects = await projectsResponse.json();
+                console.log("✅ Проекты из облака загружены:", projects.length, "шт.");
+                
+                // Для направлений и проектов фонда используем локальные данные
+                const directions = loadDirections();
+                const ftimProjects = loadFTIMProjects();
+                
+                return { 
+                    projects: Array.isArray(projects) ? projects : [],
+                    directions,
+                    ftimProjects 
+                };
+                
+            } catch (error) {
+                console.error("❌ Ошибка загрузки из облака, используем локальные данные:", error);
+                // Возвращаем локальные данные как fallback
+                return {
+                    projects: loadProjects(),
+                    directions: loadDirections(),
+                    ftimProjects: loadFTIMProjects()
+                };
+            }
+        },
+    
+        async saveProjects(projects) {
+            try {
+                console.log("💾 Сохраняем проекты в облако...");
+                
+                const response = await fetch(`${this.baseURL}/projects`, {
+                    method: 'PUT', // Используем PUT как в вашей спецификации
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(projects) // Отправляем массив проектов напрямую
+                });
+                
+                console.log("📤 Ответ сервера при сохранении:", response.status, response.statusText);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                console.log("✅ Проекты сохранены в облако");
+                return true;
+                
+            } catch (error) {
+                console.error("❌ Ошибка сохранения проектов:", error);
+                // Не бросаем ошибку, чтобы не ломать UX
+                return false;
+            }
+        },
+    
+        // Аналогично обновите saveDirections и saveFTIMProjects
+        async saveDirections(directions) {
+            try {
+                console.log("💾 Сохраняем направления в облако...");
+                
+                const response = await fetch(`${this.baseURL}/directions`, {
+                    method: 'PUT',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(directions)
+                });
+                
+                console.log("📤 Ответ сервера:", response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                console.log("✅ Направления сохранены в облако");
+                return true;
+                
+            } catch (error) {
+                console.error("❌ Ошибка сохранения направлений:", error);
+                return false;
+            }
+        },
+    
+        async saveFTIMProjects(ftimProjects) {
+            try {
+                console.log("💾 Сохраняем проекты Фонда в облако...");
+                
+                const response = await fetch(`${this.baseURL}/ftim-projects`, {
+                    method: 'PUT',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(ftimProjects)
+                });
+                
+                console.log("📤 Ответ сервера:", response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                console.log("✅ Проекты Фонда сохранены в облако");
+                return true;
+                
+            } catch (error) {
+                console.error("❌ Ошибка сохранения проектов Фонда:", error);
+                return false;
+            }
+        }
+    };
 
         /* ====================== АВТОСОХРАНЕНИЕ В ОБЛАКО ====================== */
         // Перехватываем функции сохранения для автоматической синхронизации
