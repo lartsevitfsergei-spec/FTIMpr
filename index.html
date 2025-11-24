@@ -5094,6 +5094,41 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         const OriginalDashboard = DirectionsDashboardFixed;
         
         function DirectionsDashboardFixedWithCloud() {
+            console.log("🔄 DirectionsDashboardFixedWithCloud mounted");
+    
+            // ⛔️ ОСТАНАВЛИВАЕМ ВСЕ ВОЗМОЖНЫЕ ИНТЕРВАЛЫ ПРИ ЗАГРУЗКЕ
+            useEffect(() => {
+                // Получаем ID всех активных интервалов
+                const intervalIds = Object.keys(window).filter(key => 
+                    key.startsWith('interval') || 
+                    key.includes('Interval') ||
+                    key.includes('timeout')
+                );
+                
+                console.log("🛑 Останавливаем все интервалы:", intervalIds);
+                
+                // Останавливаем ВСЕ интервалы
+                let highestIntervalId = setInterval(() => {}, 0);
+                for (let i = 1; i < highestIntervalId; i++) {
+                    clearInterval(i);
+                }
+                
+                // Останавливаем ВСЕ таймауты
+                let highestTimeoutId = setTimeout(() => {}, 0);
+                for (let i = 1; i < highestTimeoutId; i++) {
+                    clearTimeout(i);
+                }
+                
+                return () => {
+                    // При размонтировании тоже останавливаем
+                    for (let i = 1; i < highestIntervalId; i++) {
+                        clearInterval(i);
+                    }
+                    for (let i = 1; i < highestTimeoutId; i++) {
+                        clearTimeout(i);
+                    }
+                };
+            }, []);
             const [cloudData, setCloudData] = useState(null);
             const [isLoading, setIsLoading] = useState(true);
             const [error, setError] = useState(null);
