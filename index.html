@@ -4882,10 +4882,81 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
             )
           );
         }
+        /* ====================== ПРОСТОЙ МОДУЛЬ ОБЛАЧНОГО ХРАНИЛИЩА ====================== */
+        const SimpleCloudStorage = {
+            baseURL: "https://d5dj84fvqbntrqp4bgf7.apigw.yandexcloud.net",
+            
+            async loadAllData() {
+                try {
+                    console.log("🔄 Пробуем загрузить данные из облака...");
+                    
+                    const [projects, directions, ftimProjects] = await Promise.all([
+                        fetch(`${this.baseURL}/projects`).then(r => r.ok ? r.json() : []),
+                        fetch(`${this.baseURL}/directions`).then(r => r.ok ? r.json() : []),
+                        fetch(`${this.baseURL}/ftim-projects`).then(r => r.ok ? r.json() : [])
+                    ]);
+                    
+                    console.log("✅ Данные из облака загружены!");
+                    return { projects, directions, ftimProjects };
+                    
+                } catch (error) {
+                    console.log("❌ Не удалось загрузить из облака, используем локальные данные");
+                    return {
+                        projects: loadProjects(),
+                        directions: loadDirections(),
+                        ftimProjects: loadFTIMProjects()
+                    };
+                }
+            }
+        };
 
+        /* ====================== ОБНОВЛЯЕМ СУЩЕСТВУЮЩИЙ КОМПОНЕНТ ====================== */
+        const OriginalDashboard = DirectionsDashboardFixed;
+        
+        function DirectionsDashboardFixedWithCloud() {
+            const [isLoading, setIsLoading] = useState(true);
+            
+            useEffect(() => {
+                loadCloudData();
+            }, []);
+            
+            async function loadCloudData() {
+                setIsLoading(true);
+                const cloudData = await SimpleCloudStorage.loadAllData();
+                
+                // Сохраняем облачные данные в localStorage
+                saveProjects(cloudData.projects);
+                saveDirections(cloudData.directions);
+                saveFTIMProjects(cloudData.ftimProjects);
+                
+                setIsLoading(false);
+            }
+            
+            if (isLoading) {
+                return React.createElement("div", { 
+                    style: { 
+                        padding: "20px", 
+                        textAlign: "center",
+                        background: "var(--bg)",
+                        height: "100vh",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "column",
+                        gap: "16px"
+                    } 
+                }, 
+                    React.createElement("div", { style: { fontSize: "24px" } }, "🔄"),
+                    React.createElement("div", { style: { fontWeight: "600" } }, "Загружаем данные из облака..."),
+                    React.createElement("div", { className: "small" }, "Пожалуйста, подождите")
+                );
+            }
+            
+            return React.createElement(OriginalDashboard);
+        }
         // ====================== ЗАПУСК ПРИЛОЖЕНИЯ ======================
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(DirectionsDashboardFixed));
+        root.render(React.createElement(DirectionsDashboardFixedWithCloud));
         /* ====================== УЛУЧШЕННЫЙ FIT-CHECK ====================== */
 
         // Детальный анализ Fit Score с учетом оригинальности
