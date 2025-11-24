@@ -4939,16 +4939,44 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         /* ====================== МОДУЛЬ ОБЛАЧНОГО ХРАНИЛИЩА С API GATEWAY ====================== */
         const CloudStorage = {
             baseURL: "https://d5dj84fvqbntrqp4bgf7.y1haggxy.apigw.yandexcloud.net",
-            
+            async testAPI() {
+                try {
+                    console.log("🧪 Тестируем подключение к API...");
+                    
+                    const response = await fetch(`${this.baseURL}/projects`, {
+                        method: 'GET',
+                        mode: 'cors',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    console.log("✅ API доступен, статус:", response.status);
+                    return response.ok;
+                    
+                } catch (error) {
+                    console.error("❌ API недоступен:", error);
+                    return false;
+                }
+            },
             async loadAllData() {
                 try {
-                    console.log("🔄 Пробуем загрузить данные из облака...");
-                    console.log("🌐 Используем URL:", this.baseURL);
+                    console.log("🌐 Загружаем данные из облака...");
                     
                     const [projectsResponse, directionsResponse, ftimProjectsResponse] = await Promise.all([
-                        fetch(`${this.baseURL}/projects`),
-                        fetch(`${this.baseURL}/directions`),
-                        fetch(`${this.baseURL}/ftim-projects`)
+                        fetch(`${this.baseURL}/projects`, { 
+                            method: 'GET',
+                            mode: 'cors',
+                            headers: { 'Content-Type': 'application/json' }
+                        }),
+                        fetch(`${this.baseURL}/directions`, { 
+                            method: 'GET',
+                            mode: 'cors', 
+                            headers: { 'Content-Type': 'application/json' }
+                        }),
+                        fetch(`${this.baseURL}/ftim-projects`, { 
+                            method: 'GET',
+                            mode: 'cors',
+                            headers: { 'Content-Type': 'application/json' }
+                        })
                     ]);
                     
                     console.log("📊 Статусы ответов:", {
@@ -4966,102 +4994,96 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     const ftimProjects = await ftimProjectsResponse.json();
                     
                     console.log("✅ Данные из облака загружены!");
-                    console.log("📦 Получено:", {
-                        projects: projects.length,
-                        directions: directions.length,
-                        ftimProjects: ftimProjects.length
-                    });
-                    
                     return { projects, directions, ftimProjects };
                     
                 } catch (error) {
-                    console.log("❌ Не удалось загрузить из облака:", error.message);
-                    console.log("🔄 Используем локальные данные");
-                    return {
-                        projects: loadProjects(),
-                        directions: loadDirections(),
-                        ftimProjects: loadFTIMProjects()
-                    };
+                    console.error("❌ Ошибка загрузки из облака:", error);
+                    throw error;
                 }
             },
-
+        
             async saveProjects(projects) {
                 try {
-                    console.log("💾 Сохраняем проекты в облако через API Gateway...");
+                    console.log("💾 Сохраняем проекты в облако...", projects);
+                    
                     const response = await fetch(`${this.baseURL}/projects`, {
-                        method: 'PUT',
+                        method: 'POST', // Или 'PUT' в зависимости от вашего API
+                        mode: 'cors',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({ projects })
                     });
                     
-                    console.log("📤 Статус сохранения проектов:", response.status);
+                    console.log("📤 Ответ сервера:", response.status, response.statusText);
                     
-                    if (response.ok) {
-                        console.log("✅ Проекты сохранены в облако!");
-                        return true;
-                    } else {
+                    if (!response.ok) {
                         const errorText = await response.text();
-                        console.error("❌ Ошибка сохранения проектов:", errorText);
-                        return false;
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
                     }
+                    
+                    const result = await response.json();
+                    console.log("✅ Проекты сохранены в облако:", result);
+                    return true;
+                    
                 } catch (error) {
-                    console.error("❌ Ошибка сохранения в облако:", error);
+                    console.error("❌ Ошибка сохранения проектов:", error);
                     return false;
                 }
             },
-
+        
             async saveDirections(directions) {
                 try {
-                    console.log("💾 Сохраняем направления в облако через API Gateway...");
+                    console.log("💾 Сохраняем направления в облако...");
+                    
                     const response = await fetch(`${this.baseURL}/directions`, {
-                        method: 'PUT',
+                        method: 'POST',
+                        mode: 'cors',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({ directions })
                     });
                     
-                    console.log("📤 Статус сохранения направлений:", response.status);
+                    console.log("📤 Ответ сервера:", response.status);
                     
-                    if (response.ok) {
-                        console.log("✅ Направления сохранены в облако!");
-                        return true;
-                    } else {
-                        const errorText = await response.text();
-                        console.error("❌ Ошибка сохранения направлений:", errorText);
-                        return false;
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
                     }
+                    
+                    console.log("✅ Направления сохранены в облако");
+                    return true;
+                    
                 } catch (error) {
-                    console.error("❌ Ошибка сохранения в облако:", error);
+                    console.error("❌ Ошибка сохранения направлений:", error);
                     return false;
                 }
             },
-
+        
             async saveFTIMProjects(ftimProjects) {
                 try {
-                    console.log("💾 Сохраняем проекты Фонда в облако через API Gateway...");
+                    console.log("💾 Сохраняем проекты Фонда в облако...");
+                    
                     const response = await fetch(`${this.baseURL}/ftim-projects`, {
-                        method: 'PUT',
+                        method: 'POST',
+                        mode: 'cors',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({ ftimProjects })
                     });
                     
-                    console.log("📤 Статус сохранения проектов Фонда:", response.status);
+                    console.log("📤 Ответ сервера:", response.status);
                     
-                    if (response.ok) {
-                        console.log("✅ Проекты Фонда сохранены в облако!");
-                        return true;
-                    } else {
-                        const errorText = await response.text();
-                        console.error("❌ Ошибка сохранения проектов Фонда:", errorText);
-                        return false;
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
                     }
+                    
+                    console.log("✅ Проекты Фонда сохранены в облако");
+                    return true;
+                    
                 } catch (error) {
-                    console.error("❌ Ошибка сохранения в облако:", error);
+                    console.error("❌ Ошибка сохранения проектов Фонда:", error);
                     return false;
                 }
             }
@@ -5183,18 +5205,35 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
             // Функция сохранения проекта
             const saveProjectToCloud = async (project) => {
                 try {
-                    console.log("💾 Сохраняем проект в облако...", project);
+                    console.log("💾 Сохраняем отдельный проект в облако...", project);
+                    
+                    // Упрощенная структура проекта для API
+                    const projectToSave = {
+                        id: project.id,
+                        title: project.title || "Без названия",
+                        teamName: project.teamName || "",
+                        customer: project.customer || "",
+                        directionName: project.directionName || "",
+                        shortDescription: project.shortDescription || "",
+                        status: project.status || "черновик",
+                        selectedOpenCase: project.selectedOpenCase || "",
+                        createdAt: new Date().toISOString()
+                    };
                     
                     const response = await fetch("https://d5dj84fvqbntrqp4bgf7.y1haggxy.apigw.yandexcloud.net/projects", {
                         method: 'POST',
+                        mode: 'cors',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify(project)
+                        body: JSON.stringify(projectToSave)
                     });
                     
+                    console.log("📤 Статус ответа:", response.status, response.statusText);
+                    
                     if (!response.ok) {
-                        throw new Error(`Ошибка сохранения: ${response.status}`);
+                        const errorText = await response.text();
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
                     }
                     
                     const result = await response.json();
@@ -5202,18 +5241,34 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     return true;
                     
                 } catch (err) {
-                    console.error("❌ Ошибка сохранения в облако:", err);
+                    console.error("❌ Ошибка сохранения проекта в облако:", err);
+                    // НЕ ВЫКИДЫВАЕМ ОШИБКУ, чтобы не ломать UI
                     return false;
                 }
             };
         
             // Загружаем данные при монтировании
             useEffect(() => {
-                loadCloudData();
+                // ✅ Сначала тестируем API, потом загружаем данные
+                const initializeData = async () => {
+                    console.log("🔧 Инициализация приложения...");
+                    
+                    const apiAvailable = await CloudStorage.testAPI();
+                    if (apiAvailable) {
+                        console.log("🚀 API доступен, загружаем данные из облака...");
+                        await loadCloudData();
+                    } else {
+                        console.log("⚠️ API недоступен, используем локальные данные");
+                        setCloudData({
+                            projects: loadProjects(),
+                            directions: loadDirections(),
+                            ftimProjects: loadFTIMProjects()
+                        });
+                        setIsLoading(false);
+                    }
+                };
                 
-                // Обновляем данные каждые 30 секунд
-                //const interval = setInterval(loadCloudData, 30000);
-                //return () => clearInterval(interval);
+                initializeData();
             }, []);
         
             // Перехватываем сохранение проектов
