@@ -4883,7 +4883,8 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
           );
         }
         /* ====================== ПРОСТОЙ МОДУЛЬ ОБЛАЧНОГО ХРАНИЛИЩА ====================== */
-        const SimpleCloudStorage = {
+         /* ====================== МОДУЛЬ ОБЛАЧНОГО ХРАНИЛИЩА С API GATEWAY ====================== */
+        const CloudStorage = {
             baseURL: "https://d5dj84fvqbntrqp4bgf7.apigw.yandexcloud.net",
             
             async loadAllData() {
@@ -4907,7 +4908,105 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         ftimProjects: loadFTIMProjects()
                     };
                 }
+            },
+
+            async saveProjects(projects) {
+                try {
+                    console.log("💾 Сохраняем проекты в облако через API Gateway...");
+                    const response = await fetch(`${this.baseURL}/projects`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ projects })
+                    });
+                    
+                    if (response.ok) {
+                        console.log("✅ Проекты сохранены в облако!");
+                        return true;
+                    } else {
+                        const errorText = await response.text();
+                        console.error("❌ Ошибка сохранения проектов:", errorText);
+                        return false;
+                    }
+                } catch (error) {
+                    console.error("❌ Ошибка сохранения в облако:", error);
+                    return false;
+                }
+            },
+
+            async saveDirections(directions) {
+                try {
+                    console.log("💾 Сохраняем направления в облако через API Gateway...");
+                    const response = await fetch(`${this.baseURL}/directions`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ directions })
+                    });
+                    
+                    if (response.ok) {
+                        console.log("✅ Направления сохранены в облако!");
+                        return true;
+                    } else {
+                        const errorText = await response.text();
+                        console.error("❌ Ошибка сохранения направлений:", errorText);
+                        return false;
+                    }
+                } catch (error) {
+                    console.error("❌ Ошибка сохранения в облако:", error);
+                    return false;
+                }
+            },
+
+            async saveFTIMProjects(ftimProjects) {
+                try {
+                    console.log("💾 Сохраняем проекты Фонда в облако через API Gateway...");
+                    const response = await fetch(`${this.baseURL}/ftim-projects`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ ftimProjects })
+                    });
+                    
+                    if (response.ok) {
+                        console.log("✅ Проекты Фонда сохранены в облако!");
+                        return true;
+                    } else {
+                        const errorText = await response.text();
+                        console.error("❌ Ошибка сохранения проектов Фонда:", errorText);
+                        return false;
+                    }
+                } catch (error) {
+                    console.error("❌ Ошибка сохранения в облако:", error);
+                    return false;
+                }
             }
+        };
+
+        /* ====================== АВТОСОХРАНЕНИЕ В ОБЛАКО ====================== */
+        // Перехватываем функции сохранения для автоматической синхронизации
+        const originalSaveProjects = window.saveProjects;
+        window.saveProjects = function(projects) {
+            console.log("💾 Сохраняем проекты (локально + облако)...");
+            originalSaveProjects(projects); // локальное сохранение
+            CloudStorage.saveProjects(projects); // облачное сохранение
+        };
+
+        const originalSaveDirections = window.saveDirections;
+        window.saveDirections = function(directions) {
+            console.log("💾 Сохраняем направления (локально + облако)...");
+            originalSaveDirections(directions);
+            CloudStorage.saveDirections(directions);
+        };
+
+        const originalSaveFTIMProjects = window.saveFTIMProjects;
+        window.saveFTIMProjects = function(ftimProjects) {
+            console.log("💾 Сохраняем проекты Фонда (локально + облако)...");
+            originalSaveFTIMProjects(ftimProjects);
+            CloudStorage.saveFTIMProjects(ftimProjects);
         };
 
         /* ====================== ОБНОВЛЯЕМ СУЩЕСТВУЮЩИЙ КОМПОНЕНТ ====================== */
