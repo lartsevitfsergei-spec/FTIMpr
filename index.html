@@ -4941,67 +4941,40 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         const CloudStorage = {
             baseURL: "https://d5dj84fvqbntrqp4bgf7.y1haggxy.apigw.yandexcloud.net",
             
-            async testAPI() {
-                try {
-                    console.log("🧪 Тестируем подключение к API...");
-                    const response = await fetch(`${this.baseURL}/projects`, {
-                        method: 'GET',
-                        mode: 'cors',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    console.log("✅ API доступен, статус:", response.status);
-                    return true;
-                    
-                } catch (error) {
-                    console.error("❌ API недоступен:", error);
-                    return false;
-                }
-            },
-        
             async loadAllData() {
                 try {
                     console.log("🌐 Загружаем данные из облака...");
-                    const projectsResponse = await fetch(`${this.baseURL}/projects`, {
-                        method: 'GET',
-                        mode: 'cors',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        }
+                    
+                    // Загружаем проекты участников
+                    const projectsResponse = await fetch(`${this.baseURL}/projects`);
+                    if (!projectsResponse.ok) {
+                        throw new Error(`Projects: ${projectsResponse.status}`);
+                    }
+                    const projects = await projectsResponse.json();
+                    
+                    // Загружаем направления
+                    const directionsResponse = await fetch(`${this.baseURL}/directions`);
+                    const directions = directionsResponse.ok ? await directionsResponse.json() : [];
+                    
+                    // Загружаем проекты Фонда
+                    const ftimResponse = await fetch(`${this.baseURL}/ftim-projects`);
+                    const ftimProjects = ftimResponse.ok ? await ftimResponse.json() : [];
+                    
+                    console.log("✅ Данные загружены:", {
+                        projects: projects.length,
+                        directions: directions.length,
+                        ftimProjects: ftimProjects.length
                     });
                     
-                    console.log("📊 Статус ответа projects:", projectsResponse.status);
-                    
-                    if (!projectsResponse.ok) {
-                        throw new Error(`Projects: ${projectsResponse.status} ${projectsResponse.statusText}`);
-                    }
-                    
-                    const projects = await projectsResponse.json();
-                    console.log("✅ Проекты из облака загружены:", projects.length, "шт.");
-                    
-                    const directions = loadDirections();
-                    const ftimProjects = loadFTIMProjects();
-                    
-                    return { 
-                        projects: Array.isArray(projects) ? projects : [],
-                        directions,
-                        ftimProjects 
-                    };
+                    return { projects, directions, ftimProjects };
                     
                 } catch (error) {
-                    console.error("❌ Ошибка загрузки из облака, используем локальные данные:", error);
+                    console.error("❌ Ошибка загрузки из облака:", error);
+                    // Возвращаем пустые данные при ошибке
                     return {
-                        projects: loadProjects(),
-                        directions: loadDirections(),
-                        ftimProjects: loadFTIMProjects()
+                        projects: [],
+                        directions: [],
+                        ftimProjects: []
                     };
                 }
             },
@@ -5009,21 +4982,16 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
             async saveProjects(projects) {
                 try {
                     console.log("💾 Сохраняем проекты в облако...");
-                    
                     const response = await fetch(`${this.baseURL}/projects`, {
                         method: 'PUT',
-                        mode: 'cors',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify(projects)
                     });
                     
-                    console.log("📤 Ответ сервера при сохранении:", response.status, response.statusText);
-                    
                     if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+                        throw new Error(`HTTP ${response.status}`);
                     }
                     
                     console.log("✅ Проекты сохранены в облако");
@@ -5038,17 +5006,13 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
             async saveDirections(directions) {
                 try {
                     console.log("💾 Сохраняем направления в облако...");
-                    
                     const response = await fetch(`${this.baseURL}/directions`, {
                         method: 'PUT',
-                        mode: 'cors',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify(directions)
                     });
-                    
-                    console.log("📤 Ответ сервера:", response.status);
                     
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
@@ -5066,17 +5030,13 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
             async saveFTIMProjects(ftimProjects) {
                 try {
                     console.log("💾 Сохраняем проекты Фонда в облако...");
-                    
                     const response = await fetch(`${this.baseURL}/ftim-projects`, {
                         method: 'PUT',
-                        mode: 'cors',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify(ftimProjects)
                     });
-                    
-                    console.log("📤 Ответ сервера:", response.status);
                     
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
@@ -5169,19 +5129,9 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                 try {
                     console.log("🌐 Загружаем данные из облака...");
                     
-                    const response = await fetch("https://d5dj84fvqbntrqp4bgf7.y1haggxy.apigw.yandexcloud.net/projects");
-                    if (!response.ok) {
-                        throw new Error(`Ошибка HTTP: ${response.status}`);
-                    }
+                    const cloudData = await CloudStorage.loadAllData();
                     
-                    const projects = await response.json();
-                    console.log("✅ Проекты из облака:", projects);
-                    
-                    setCloudData({
-                        projects: projects,
-                        directions: loadDirections(),
-                        ftimProjects: loadFTIMProjects()
-                    });
+                    setCloudData(cloudData);
                     
                     if (showNotification) {
                         console.log("✅ Данные успешно обновлены из облака");
@@ -5195,6 +5145,7 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         alert("❌ Не удалось обновить данные из облака. Проверьте подключение к интернету.");
                     }
                     
+                    // Используем локальные данные как fallback
                     setCloudData({
                         projects: loadProjects(),
                         directions: loadDirections(),
