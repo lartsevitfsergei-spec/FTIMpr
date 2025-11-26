@@ -1669,6 +1669,11 @@
 
         /* ====================== Нормализация проектов ====================== */
         function normalizeProject(p, directions) {
+            // ✅ ГАРАНТИРУЕМ, что p - объект
+            if (!p || typeof p !== 'object') {
+                p = {};
+            }
+            
             const id = p.id || uuid();
             const pilot = {
                 site: p?.pilot?.site || "",
@@ -1679,6 +1684,9 @@
                 stepsPlan: p?.pilot?.stepsPlan || "",
                 successCriteria: p?.pilot?.successCriteria || "",
             };
+            
+            // ✅ ГАРАНТИРУЕМ, что directions - массив
+            const safeDirections = Array.isArray(directions) ? directions : [];
             
             // Новые поля для расширенной самооценки
             const projBase = {
@@ -1712,11 +1720,11 @@
                 status: p.status === "черновик" ? "черновик" : "готов",
             };
             // Поддерживаем актуальность расчетов
-            projBase.fitScore = computeFitScore(projBase, directions);
+            projBase.fitScore = computeFitScore(projBase, safeDirections);
             projBase.pilotReadiness = computePilotReadiness(projBase);
-            const dirObj = directions.find((d) => d.name === projBase.directionName);
+            const dirObj = safeDirections.find((d) => d.name === projBase.directionName);
             projBase.ideaAdequacy = computeIdeaAdequacy(projBase, dirObj);
-
+        
             // Подгоняем длину selfAssessmentNotes под требования
             const reqLen = dirObj?.requirements?.length || 0;
             if (projBase.selfAssessmentNotes.length < reqLen) {
@@ -5079,6 +5087,11 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         const originalSaveProjects = window.saveProjects;
         window.saveProjects = function(projects) {
             console.log("💾 Сохраняем проекты (локально + облако)...");
+            // ✅ ГАРАНТИРУЕМ, что projects - массив
+            if (!Array.isArray(projects)) {
+                console.error("❌ projects не является массивом, преобразуем в пустой массив:", projects);
+                projects = [];
+            }
             originalSaveProjects(projects); // локальное сохранение
             CloudStorage.saveProjects(projects); // облачное сохранение
         };
