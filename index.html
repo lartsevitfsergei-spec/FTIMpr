@@ -5207,19 +5207,8 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                 const initializeData = async () => {
                     console.log("🔧 Инициализация приложения...");
                     
-                    const apiAvailable = await CloudStorage.testAPI();
-                    if (apiAvailable) {
-                        console.log("🚀 API доступен, загружаем данные из облака...");
-                        await loadCloudData();
-                    } else {
-                        console.log("⚠️ API недоступен, используем локальные данные");
-                        setCloudData({
-                            projects: loadProjects(),
-                            directions: loadDirections(),
-                            ftimProjects: loadFTIMProjects()
-                        });
-                        setIsLoading(false);
-                    }
+                    console.log("🚀 Загружаем данные из облака...");
+                    await loadCloudData();
                 };
                 
                 initializeData();
@@ -5758,3 +5747,4 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
     </script>
 </body>
 </html>
+
