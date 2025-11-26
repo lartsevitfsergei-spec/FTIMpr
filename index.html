@@ -3708,21 +3708,41 @@
 
         /* ====================== Главный компонент ====================== */
         function DirectionsDashboardFixed({ cloudData, onDataRefresh }) {
-            const [directions, setDirections] = useState(cloudData ? cloudData.directions : loadDirections());
-            const [projects, setProjects] = useState(cloudData ? cloudData.projects : loadProjects());
-            const [ftimProjects, setFtimProjects] = useState(cloudData ? cloudData.ftimProjects : loadFTIMProjects());
+            const [directions, setDirections] = useState(() => {
+              if (cloudData && cloudData.directions) {
+                return Array.isArray(cloudData.directions) ? cloudData.directions : [];
+              }
+              const loaded = loadDirections();
+              return Array.isArray(loaded) ? loaded : [];
+            });
+            
+            const [projects, setProjects] = useState(() => {
+              if (cloudData && cloudData.projects) {
+                return Array.isArray(cloudData.projects) ? cloudData.projects : [];
+              }
+              const loaded = loadProjects();
+              return Array.isArray(loaded) ? loaded : [];
+            });
+            
+            const [ftimProjects, setFtimProjects] = useState(() => {
+              if (cloudData && cloudData.ftimProjects) {
+                return Array.isArray(cloudData.ftimProjects) ? cloudData.ftimProjects : [];
+              }
+              const loaded = loadFTIMProjects();
+              return Array.isArray(loaded) ? loaded : [];
+            });
             const [lastUpdate, setLastUpdate] = useState(new Date());
         
             // Обновляем состояние при изменении cloudData
             useEffect(() => {
                 if (cloudData) {
-                    setDirections(cloudData.directions);
-                    setProjects(cloudData.projects);
-                    setFtimProjects(cloudData.ftimProjects);
+                    setDirections(Array.isArray(cloudData.directions) ? cloudData.directions : []);
+                    setProjects(Array.isArray(cloudData.projects) ? cloudData.projects : []);
+                    setFtimProjects(Array.isArray(cloudData.ftimProjects) ? cloudData.ftimProjects : []);
                     setLastUpdate(new Date());
                 }
             }, [cloudData]);
-            
+                        
             /* ====================== СОСТОЯНИЯ ПОЛЬЗОВАТЕЛЕЙ ====================== */
             const [currentUser, setCurrentUser] = useState(() => {
                 try {
@@ -3800,23 +3820,23 @@
 
             const unified = useMemo(() => {
                 if (dataset === "directions") {
-                    return directions.map((d) => ({ type: "direction", ...d }));
+                    return Array.isArray(directions) ? directions.map((d) => ({ type: "direction", ...d })) : [];
                 } else if (dataset === "projects") {
-                    return projects.map((p) => ({
+                    return Array.isArray(projects) ? projects.map((p) => ({
                         type: "project",
                         ...p,
                         customers: [p.customer],
                         description: p.shortDescription || "",
-                    }));
+                    })) : [];
                 } else if (dataset === "ftimProjects") {
-                    return ftimProjects.map((p) => ({
+                    return Array.isArray(ftimProjects) ? ftimProjects.map((p) => ({
                         type: "ftimProject",
                         ...p,
                         name: p.projectName,
                         description: p.description,
                         customers: [],
                         directionName: p.directionName
-                    }));
+                    })) : [];
                 }
                 return [];
             }, [dataset, directions, projects, ftimProjects]);
@@ -3924,8 +3944,10 @@
 
             const addOrUpdateProject = (project) => {
                 setProjects((prev) => {
-                    const exists = prev.some((p) => p.id === project.id);
-                    const next = exists ? prev.map((p) => (p.id === project.id ? project : p)) : [project, ...prev];
+                    // ✅ ГАРАНТИРУЕМ, что prev - массив
+                    const prevArray = Array.isArray(prev) ? prev : [];
+                    const exists = prevArray.some((p) => p.id === project.id);
+                    const next = exists ? prevArray.map((p) => (p.id === project.id ? project : p)) : [project, ...prevArray];
                     saveProjects(next);
                     return next;
                 });
@@ -5747,4 +5769,3 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
     </script>
 </body>
 </html>
-
