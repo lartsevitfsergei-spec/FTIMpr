@@ -3768,6 +3768,7 @@
             const [dataset, setDataset] = useState("directions");
             const [view, setView] = useState("cards");
             const [search, setSearch] = useState("");
+            const [directionFilter, setDirectionFilter] = useState("active");
             const debouncedSearch = useDebounced(search, 200);
             const [filterCustomers, setFilterCustomers] = useState([]);
             const [filterEffects, setFilterEffects] = useState([]);
@@ -3835,26 +3836,63 @@
 
             const unified = useMemo(() => {
                 if (dataset === "directions") {
-                    return Array.isArray(directions) ? directions.map((d) => ({ type: "direction", ...d })) : [];
-                } else if (dataset === "projects") {
-                    return Array.isArray(projects) ? projects.map((p) => ({
+                    let filteredDirections = Array.isArray(directions) ? directions : [];
+                    
+                    // Фильтрация по статусу (для всех пользователей)
+                    if (directionFilter === "active") {
+                        filteredDirections = filteredDirections.filter(d => !d.archived);
+                    } else if (directionFilter === "archived") {
+                        filteredDirections = filteredDirections.filter(d => d.archived);
+                    }
+                    // "all" - не фильтруем
+                    
+                    // Дополнительная фильтрация для участников (скрываем архивные полностью)
+                    if (currentUser?.role === USER_ROLES.PARTICIPANT) {
+                        filteredDirections = filteredDirections.filter(d => !d.archived);
+                    }
+                    
+                    return filteredDirections.map((d) => ({ type: "direction", ...d }));
+                }
+                else if (dataset === "projects") {
+                    let filteredProjects = Array.isArray(projects) ? projects : [];
+                    
+                    // Если пользователь - участник, скрываем проекты с архивными направлениями
+                    if (currentUser?.role === USER_ROLES.PARTICIPANT) {
+                        filteredProjects = filteredProjects.filter(project => {
+                            const projectDirection = directions.find(d => d.name === project.directionName);
+                            // Показываем проект только если направление не архивное ИЛИ направление не найдено (на всякий случай)
+                            return !projectDirection || !projectDirection.archived;
+                        });
+                    }
+                    
+                    return filteredProjects.map((p) => ({
                         type: "project",
                         ...p,
                         customers: [p.customer],
                         description: p.shortDescription || "",
-                    })) : [];
+                    }));
                 } else if (dataset === "ftimProjects") {
-                    return Array.isArray(ftimProjects) ? ftimProjects.map((p) => ({
+                    let filteredFTIMProjects = Array.isArray(ftimProjects) ? ftimProjects : [];
+                    
+                    // Если пользователь - участник, скрываем проекты с архивными направлениями
+                    if (currentUser?.role === USER_ROLES.PARTICIPANT) {
+                        filteredFTIMProjects = filteredFTIMProjects.filter(project => {
+                            const projectDirection = directions.find(d => d.name === project.directionName);
+                            return !projectDirection || !projectDirection.archived;
+                        });
+                    }
+                    
+                    return filteredFTIMProjects.map((p) => ({
                         type: "ftimProject",
                         ...p,
                         name: p.projectName,
                         description: p.description,
                         customers: [],
                         directionName: p.directionName
-                    })) : [];
+                    }));
                 }
                 return [];
-            }, [dataset, directions, projects, ftimProjects]);
+            }, [dataset, directions, projects, ftimProjects, currentUser]);
 
             const filtered = useMemo(() => {
                 const s = debouncedSearch.trim().toLowerCase();
@@ -4276,6 +4314,24 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         React.createElement("span", { className: "small" }, "Найдено:"),
                         React.createElement("span", { className: "status-count" }, filtered.length)
                     ),
+                    
+                    // Для направлений показываем расширенную статистику
+                    dataset === "directions" ? 
+                    React.createElement(React.Fragment, null,
+                        React.createElement("div", { className: "status-item" },
+                            React.createElement("span", { className: "small" }, "Действующие:"),
+                            React.createElement("span", { className: "status-count" }, 
+                                directions.filter(d => !d.archived).length
+                            )
+                        ),
+                        React.createElement("div", { className: "status-item" },
+                            React.createElement("span", { className: "small" }, "В архиве:"),
+                            React.createElement("span", { className: "status-count" }, 
+                                directions.filter(d => d.archived).length
+                            )
+                        )
+                    ) :
+                    // Для других вкладок - обычный счетчик
                     React.createElement("div", { className: "status-item" },
                         React.createElement("span", { className: "small" }, "Всего:"),
                         React.createElement("span", { className: "status-count" }, unified.length)
@@ -4304,7 +4360,6 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                 style: { position: "absolute", left: 12, top: 10, opacity: .6 } 
                             }, "🔎")
                         ),
-
                         dataset !== "ftimProjects" && React.createElement(React.Fragment, null,
                             React.createElement(MultiSelectDropdown, {
                                 label: "Фильтр: Заказчик",
@@ -4330,7 +4385,18 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                 options: DIT_TAGS,
                                 values: filterTags,
                                 setValues: setFilterTags
-                            })
+                            }), // ← ДОБАВЛЕНА ЗАПЯТАЯ ЗДЕСЬ!
+                            dataset === "directions" && currentUser?.role === USER_ROLES.FOUNDATION && 
+                            React.createElement("select", {
+                                className: "select",
+                                value: directionFilter,
+                                onChange: (e) => setDirectionFilter(e.target.value),
+                                style: { minWidth: '180px' }
+                            },
+                                React.createElement("option", { value: "active" }, "Действующие"),
+                                React.createElement("option", { value: "archived" }, "В архиве"),
+                                React.createElement("option", { value: "all" }, "Все направления")
+                            )
                         )
                     ),
 
@@ -4454,28 +4520,40 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                             key: isProject ? "p:" + it.id : isFTIMProject ? "f:" + it.id : "d:" + it.code,
                             className: "card",
                             role: "listitem"
-                        }, React.createElement("div", { className: "card-head" },
-                            React.createElement("div", null,
+                        }, 
+                            // card-head
+                            React.createElement("div", { className: "card-head" },
                                 React.createElement("div", { 
                                     style: { fontWeight: 600, display: "flex", alignItems: "center", gap: 8 } 
-                                }, React.createElement("span", null, isProject ? it.title : isFTIMProject ? it.projectName : it.name),
-                                isProject ? React.createElement(Badge, { kind: "accent" }, "Проект") : 
-                                isFTIMProject ? React.createElement(Badge, { kind: "accent" }, "ФТИМ") : 
-                                React.createElement(Badge, { kind: "accent" }, "Направление")),
+                                }, 
+                                    React.createElement("span", null, isProject ? it.title : isFTIMProject ? it.projectName : it.name),
+                                    // Для проектов и ФТИМ проектов оставляем как есть
+                                    isProject ? React.createElement(Badge, { kind: "accent" }, "Проект") : 
+                                    isFTIMProject ? React.createElement(Badge, { kind: "accent" }, "ФТИМ") : 
+                                    // Для направлений: показываем бейдж "Направление" и, если архивное, то еще бейдж "Архив"
+                                    React.createElement(React.Fragment, null,
+                                        React.createElement(Badge, { kind: "accent" }, "Направление"),
+                                        it.archived && React.createElement(Badge, { 
+                                            kind: "muted", 
+                                            style: { background: '#6b7280', color: 'white' },
+                                            title: "Направление в архиве"
+                                        }, "Архив")
+                                    )
+                                ),
                                 React.createElement("div", { 
                                     className: "small", 
                                     style: { marginTop: 4 } 
-                                }, it.description || "—")
-                            ),
-                            !isFTIMProject && React.createElement("div", { className: "chips" },
-                                (isProject ? it.customers : it.customersRecommended || []).map((c) =>
-                                    React.createElement(Badge, { 
-                                        key: c, 
-                                        title: "Заказчик: " + c 
-                                    }, c)
+                                }, it.description || "—"),
+                                !isFTIMProject && React.createElement("div", { className: "chips" },
+                                    (isProject ? it.customers : it.customersRecommended || []).map((c) =>
+                                        React.createElement(Badge, { 
+                                            key: c, 
+                                            title: "Заказчик: " + c 
+                                        }, c)
+                                    )
                                 )
-                            )
-                        ), React.createElement("div", { className: "card-body" },
+                            ),
+                        React.createElement("div", { className: "card-body" },
                             !isFTIMProject && React.createElement("div", { className: "chips" },
                                 (isProject ? it.effectTags : it.recommendedEffects || []).map((e) =>
                                     React.createElement(Badge, { 
