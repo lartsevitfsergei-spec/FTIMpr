@@ -1972,7 +1972,6 @@
             return React.createElement(React.Fragment, null,
                 React.createElement("div", { 
                     className: "modal-backdrop", 
-                    onClick: onClose, 
                     "aria-hidden": "true" 
                 }),
                 React.createElement("aside", {
@@ -3166,7 +3165,6 @@
         
           return React.createElement("div", { 
             className: "center-modal-backdrop",
-            onClick: (e) => e.target === e.currentTarget && onClose()
           }, 
             React.createElement("div", {
               className: "center-modal",
@@ -4824,7 +4822,6 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
         
           return React.createElement("div", { 
             className: "instruction-backdrop",
-            onClick: (e) => e.target === e.currentTarget && onClose()
           }, 
             React.createElement("div", {
               className: "instruction-modal",
