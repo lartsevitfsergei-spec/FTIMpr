@@ -4014,6 +4014,37 @@
                 });
                 setDirCreateOpen(false);
             };
+            
+            const deleteDirection = (directionCode) => {
+                if (!canEditDirections) {
+                    alert("❌ Недостаточно прав для удаления направлений");
+                    return;
+                }
+                
+                // Находим направление которое хотим удалить
+                const directionToDelete = directions.find(d => d.code === directionCode);
+                if (!directionToDelete) return;
+                
+                // Проверяем, используется ли направление в проектах
+                const directionName = directionToDelete.name;
+                const projectsUsingThisDirection = projects.filter(p => p.directionName === directionName);
+                const ftimProjectsUsingThisDirection = ftimProjects.filter(p => p.directionName === directionName);
+                
+                if (projectsUsingThisDirection.length > 0 || ftimProjectsUsingThisDirection.length > 0) {
+                    alert(`❌ Невозможно удалить направление "${directionName}". Оно используется в:\n\n• ${projectsUsingThisDirection.length} проектах участников\n• ${ftimProjectsUsingThisDirection.length} проектах ФТИМ\n\nСначала удалите или измените эти проекты.`);
+                    return;
+                }
+                
+                // Если не используется - удаляем
+                if (confirm(`Вы уверены, что хотите удалить направление "${directionName}"? Это действие нельзя отменить.`)) {
+                    setDirections((prev) => {
+                        const newDirections = prev.filter(d => d.code !== directionCode);
+                        saveDirections(newDirections);
+                        return newDirections;
+                    });
+                    alert("✅ Направление удалено");
+                }
+            };
 
             const exportJSON = () => {
                 const payload =
@@ -4547,12 +4578,20 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                         "🏢 Проект Фонда ТИМ"
                                     )
                                 ) : canEditDirections ? 
-                                    React.createElement("button", {
-                                        className: "btn primary",
-                                        onClick: () => onEditDirection(it),
-                                        "aria-label": "Редактировать направление"
-                                    }, "Редактировать направление") :
-                                    React.createElement("span", { className: "small" }, 
+                                      React.createElement("div", { className: "chips" },
+                                        React.createElement("button", {
+                                          className: "btn primary",
+                                          onClick: () => onEditDirection(it),
+                                          "aria-label": "Редактировать направление"
+                                        }, "Редактировать"),
+                                        React.createElement("button", {
+                                          className: "btn",
+                                          onClick: () => deleteDirection(it.code),
+                                          "aria-label": "Удалить направление",
+                                          style: { background: 'var(--red)', color: 'white' }
+                                        }, "Удалить")
+                                      ) :
+                                      React.createElement("span", { className: "small" }, 
                                         "📖 Только для просмотра"
                                 )
                             )
@@ -4713,12 +4752,20 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                         "Проект Фонда ТИМ"
                                                     )    
                                                 ) : canEditDirections ? 
-                                                    React.createElement("button", {
-                                                        className: "btn primary",
-                                                        onClick: () => onEditDirection(it),
-                                                        "aria-label": "Редактировать"
-                                                    }, "Редактировать") :
-                                                    React.createElement("span", { className: "small" }, 
+                                                      React.createElement("div", { className: "chips" },
+                                                        React.createElement("button", {
+                                                          className: "btn primary",
+                                                          onClick: () => onEditDirection(it),
+                                                          "aria-label": "Редактировать"
+                                                        }, "Редактировать"),
+                                                        React.createElement("button", {
+                                                          className: "btn",
+                                                          onClick: () => deleteDirection(it.code),
+                                                          "aria-label": "Удалить направление",
+                                                          style: { background: 'var(--red)', color: 'white' }
+                                                        }, "Удалить")
+                                                      ) :
+                                                      React.createElement("span", { className: "small" }, 
                                                         "Только просмотр"
                                                 )        
                                             )
