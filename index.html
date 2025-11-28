@@ -2756,8 +2756,10 @@
                                         value: directionName,
                                         onChange: (e) => onDirectionChange(e.target.value)
                                     }, React.createElement("option", { value: "" }, "Выберите направление"),
-                                    directions.map((d) =>
-                                        React.createElement("option", { key: d.code, value: d.name }, d.name)
+                                    directions
+                                        .filter(d => !d.archived) // ← ДОБАВЛЯЕМ ФИЛЬТРАЦИЮ
+                                        .map((d) =>
+                                            React.createElement("option", { key: d.code, value: d.name }, d.name)
                                     ))
                                 ),
                                 React.createElement("div", { className: "field-group" },
@@ -3701,8 +3703,10 @@
                     "aria-invalid": !!errors.directionName,
                     "aria-describedby": errors.directionName ? "err-dir" : undefined
                 }, React.createElement("option", { value: "" }, "Выберите направление"),
-                directions.map((d) =>
-                    React.createElement("option", { key: d.code, value: d.name }, d.name)
+                directions
+                    .filter(d => !d.archived) // ← ДОБАВЛЯЕМ ФИЛЬТРАЦИЮ
+                    .map((d) =>
+                        React.createElement("option", { key: d.code, value: d.name }, d.name)
                 )),
                 errors.directionName && React.createElement("div", { 
                     id: "err-dir", 
@@ -3822,7 +3826,12 @@
             const canEditFTIMProjects = currentUser?.role === USER_ROLES.FOUNDATION;
             const canEditProjects = !!currentUser; // Любой авторизованный пользователь может редактировать проекты
             
-            const directionNamesAll = useMemo(() => directions.map((d) => d.name), [directions]);
+            const directionNamesAll = useMemo(() => 
+                directions
+                    .filter(d => !d.archived) // ← ДОБАВЛЯЕМ ФИЛЬТРАЦИЮ
+                    .map((d) => d.name), 
+                [directions]
+            );
 
             const unified = useMemo(() => {
                 if (dataset === "directions") {
@@ -4015,34 +4024,30 @@
                 setDirCreateOpen(false);
             };
             
-            const deleteDirection = (directionCode) => {
+            const archiveDirection = (directionCode) => {
                 if (!canEditDirections) {
-                    alert("❌ Недостаточно прав для удаления направлений");
+                    alert("❌ Недостаточно прав для архивации направлений");
                     return;
                 }
                 
-                // Находим направление которое хотим удалить
-                const directionToDelete = directions.find(d => d.code === directionCode);
-                if (!directionToDelete) return;
+                // Находим направление которое хотим архивировать
+                const directionToArchive = directions.find(d => d.code === directionCode);
+                if (!directionToArchive) return;
                 
-                // Проверяем, используется ли направление в проектах
-                const directionName = directionToDelete.name;
-                const projectsUsingThisDirection = projects.filter(p => p.directionName === directionName);
-                const ftimProjectsUsingThisDirection = ftimProjects.filter(p => p.directionName === directionName);
+                const directionName = directionToArchive.name;
                 
-                if (projectsUsingThisDirection.length > 0 || ftimProjectsUsingThisDirection.length > 0) {
-                    alert(`❌ Невозможно удалить направление "${directionName}". Оно используется в:\n\n• ${projectsUsingThisDirection.length} проектах участников\n• ${ftimProjectsUsingThisDirection.length} проектах ФТИМ\n\nСначала удалите или измените эти проекты.`);
-                    return;
-                }
-                
-                // Если не используется - удаляем
-                if (confirm(`Вы уверены, что хотите удалить направление "${directionName}"? Это действие нельзя отменить.`)) {
+                // Подтверждение архивации
+                if (confirm(`Вы уверены, что хотите архивировать направление "${directionName}"?\n\nАрхивированные направления:\n• Не показываются в основном списке\n• Не доступны для новых проектов\n• Существующие проекты сохраняют связь`)) {
                     setDirections((prev) => {
-                        const newDirections = prev.filter(d => d.code !== directionCode);
+                        const newDirections = prev.map(d => 
+                            d.code === directionCode 
+                                ? { ...d, archived: true } 
+                                : d
+                        );
                         saveDirections(newDirections);
                         return newDirections;
                     });
-                    alert("✅ Направление удалено");
+                    alert("✅ Направление перемещено в архив");
                 }
             };
 
@@ -4488,7 +4493,16 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                             ),
                             isProject ? React.createElement(React.Fragment, null,
                                 React.createElement("div", { className: "small" },
-                                    React.createElement("span", { className: "muted" }, "Направление:"), " ", it.directionName || "—"),
+                                    React.createElement("span", { className: "muted" }, "Направление:"), " ", 
+                                    it.directionName || "—",
+                                    // Добавляем пометку для архивных направлений
+                                    directions.find(d => d.name === it.directionName)?.archived && 
+                                    React.createElement(Badge, { 
+                                        kind: "muted", 
+                                        style: { marginLeft: 8 },
+                                        title: "Это направление больше не активно"
+                                    }, "Архив")
+                                ),
                                 React.createElement("div", { className: "chips" },
                                     React.createElement("span", { 
                                         className: "small", 
@@ -4586,10 +4600,10 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                         }, "Редактировать"),
                                         React.createElement("button", {
                                           className: "btn",
-                                          onClick: () => deleteDirection(it.code),
-                                          "aria-label": "Удалить направление",
-                                          style: { background: 'var(--red)', color: 'white' }
-                                        }, "Удалить")
+                                          onClick: () => archiveDirection(it.code),
+                                          "aria-label": "Архивировать направление",
+                                          style: { background: 'var(--yellow)', color: 'black' }
+                                        }, "В архив")
                                       ) :
                                       React.createElement("span", { className: "small" }, 
                                         "📖 Только для просмотра"
@@ -4760,10 +4774,10 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                         }, "Редактировать"),
                                                         React.createElement("button", {
                                                           className: "btn",
-                                                          onClick: () => deleteDirection(it.code),
-                                                          "aria-label": "Удалить направление",
-                                                          style: { background: 'var(--red)', color: 'white' }
-                                                        }, "Удалить")
+                                                          onClick: () => archiveDirection(it.code),
+                                                          "aria-label": "Архивировать направление",
+                                                          style: { background: 'var(--yellow)', color: 'black' }
+                                                        }, "В архив")
                                                       ) :
                                                       React.createElement("span", { className: "small" }, 
                                                         "Только просмотр"
