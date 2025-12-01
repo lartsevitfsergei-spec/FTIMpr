@@ -5016,29 +5016,18 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                         className: "btn primary",
                                         onClick: () => onEditProject(it),
                                         "aria-label": "Редактировать проект"
-                                    }, "Редактировать")
-                                ) : isProject ? React.createElement(React.Fragment, null,
-                                      React.createElement("button", {
-                                        className: "btn",
-                                        onClick: () => openFit(it),
-                                        "aria-label": "Fit-Check"
-                                      }, "Fit-Check"),
-                                      React.createElement("button", {
-                                        className: "btn primary",
-                                        onClick: () => onEditProject(it),
-                                        "aria-label": "Редактировать проект"
-                                      }, "Редактировать"),
-                                      // ДОБАВЬТЕ ЭТУ КНОПКУ:
-                                      canEditProjects && React.createElement("button", {
+                                    }, "Редактировать"),
+                                    // ДОБАВЬТЕ ЭТУ КНОПКУ:
+                                    canEditProjects && React.createElement("button", {
                                         className: "btn",
                                         onClick: () => handleDeleteProject(it.id),
                                         "aria-label": "Удалить проект",
                                         style: { 
-                                          background: 'var(--red)', 
-                                          color: 'white',
-                                          marginLeft: '4px'
+                                            background: 'var(--red)', 
+                                            color: 'white',
+                                            marginLeft: '4px'
                                         }
-                                      }, "🗑️ Удалить")
+                                    }, "🗑️ Удалить")
                                     ) : isFTIMProject ? (canEditFTIMProjects ? 
                                       React.createElement(React.Fragment, null,
                                         // ИЗМЕНИТЕ ЭТУ СУЩЕСТВУЮЩУЮ КНОПКУ:
