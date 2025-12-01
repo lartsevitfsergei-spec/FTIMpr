@@ -145,6 +145,91 @@
         ),
         .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: start; }
         .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+        /* Улучшаем стили фильтров */
+        .filters { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 12px; 
+            align-items: start;
+            margin-bottom: 8px;
+        }
+        
+        /* На десктопе - фильтры в одну линию */
+        @media (min-width: 768px) {
+            .filters {
+                flex-wrap: nowrap;
+                align-items: center;
+                margin-bottom: 0;
+            }
+        }
+        
+        /* Каждый фильтр - карточка */
+        .filter-item {
+            min-width: 140px;
+            max-width: 200px;
+            flex: 1;
+        }
+        
+        /* Поиск шире других */
+        .filter-item.search {
+            min-width: 200px;
+            flex: 2;
+        }
+        
+        /* Стиль для dropdown фильтров */
+        .filter-dropdown {
+            position: relative;
+            min-width: 140px;
+        }
+        
+        .filter-dropdown .btn {
+            width: 100%;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: left;
+        }
+        
+        .filter-dropdown .btn:hover {
+            background: #f8fafc;
+            border-color: var(--accent-light);
+        }
+        
+        .filter-dropdown .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            z-index: 50;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: var(--shadow);
+        }
+        
+        .filter-dropdown .dropdown-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            font-size: 14px;
+        }
+        
+        .filter-dropdown .dropdown-item:hover {
+            background: #f1f5f9;
+        }
+        
+        /* Скрываем лейблы в тулбаре */
+        .toolbar .filter-dropdown .label {
+            display: none;
+        }
 
         /* ОБНОВЛЕННЫЕ КОМПОНЕНТЫ ФОРМ */
         .input, .select, .btn, .textarea {
@@ -4690,77 +4775,81 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
 
                 React.createElement("section", { className: "toolbar", role: "region", "aria-label": "Фильтры" },
                     React.createElement("div", { className: "filters" },
-                        React.createElement("div", { style: { position: "relative", flex: "1 1 260px", minWidth: 220 } },
+                        React.createElement("div", { className: "filter-item search", style: { position: "relative" } },
                             React.createElement("input", {
                                 className: "input",
-                                style: { width: "100%", paddingLeft: 36 },
-                                placeholder: "Поиск (название, описание, теги, эффекты, заказчик)",
+                                style: { 
+                                    width: "100%", 
+                                    paddingLeft: 36,
+                                    paddingRight: 12
+                                },
+                                placeholder: "Поиск по всем полям...",
                                 value: search,
                                 onChange: (e) => setSearch(e.target.value),
                                 "aria-label": "Поиск"
                             }),
                             React.createElement("span", { 
-                                className: "icon", 
-                                style: { position: "absolute", left: 12, top: 10, opacity: .6 } 
+                                style: { 
+                                    position: "absolute", 
+                                    left: 12, 
+                                    top: "50%", 
+                                    transform: "translateY(-50%)", 
+                                    opacity: .6,
+                                    pointerEvents: "none"
+                                } 
                             }, "🔎")
                         ),
                         dataset !== "ftimProjects" && React.createElement(React.Fragment, null,
                             React.createElement(MultiSelectDropdown, {
-                                label: "Фильтр: Заказчик",
+                                label: "Заказчик",
                                 options: CUSTOMERS,
                                 values: filterCustomers,
                                 setValues: setFilterCustomers
                             }),
                             React.createElement(MultiSelectDropdown, {
-                                label: "Фильтр: Эффект",
+                                label: "Эффект",
                                 options: EFFECT_OPTIONS,
                                 values: filterEffects,
                                 setValues: setFilterEffects,
                                 defs: EFFECT_DEFINITIONS
                             }),
                             React.createElement(MultiSelectDropdown, {
-                                label: "Фильтр: Направление",
+                                label: "Направление",
                                 options: directionNamesAll,
                                 values: filterDirNames,
                                 setValues: setFilterDirNames
                             }),
                             React.createElement(MultiSelectDropdown, {
-                                label: "Фильтр: Теги ДИТ",
+                                label: "Теги ДИТ",
                                 options: DIT_TAGS,
                                 values: filterTags,
                                 setValues: setFilterTags
                             }), // ← ДОБАВЛЕНА ЗАПЯТАЯ ЗДЕСЬ!
                             dataset === "directions" && currentUser?.role === USER_ROLES.FOUNDATION && 
-                            React.createElement("div", { 
-                                style: { 
-                                    display: "flex", 
-                                    alignItems: "center", 
-                                    gap: "8px",
-                                    border: "1px solid var(--border)",
-                                    borderRadius: "8px",
-                                    padding: "0 12px",
-                                    background: "white"
-                                }
-                            },
-                                React.createElement("span", { 
-                                    className: "small",
-                                    style: { whiteSpace: "nowrap" }
-                                }, "Показывать:"),
-                                React.createElement("select", {
-                                    className: "select",
-                                    value: directionFilter,
-                                    onChange: (e) => setDirectionFilter(e.target.value),
+                        React.createElement("div", { className: "filter-item" },
+                            React.createElement("div", { className: "filter-dropdown" },
+                                React.createElement("button", {
+                                    className: "btn",
+                                    onClick: () => {
+                                        // Простой dropdown
+                                        const newValue = directionFilter === "active" ? "archived" : 
+                                                        directionFilter === "archived" ? "all" : "active";
+                                        setDirectionFilter(newValue);
+                                    },
                                     style: { 
-                                        border: "none",
-                                        background: "transparent",
-                                        padding: "8px 0"
+                                        width: "100%",
+                                        display: "flex",
+                                        justifyContent: "space-between"
                                     }
                                 },
-                                    React.createElement("option", { value: "active" }, "Действующие направления"),
-                                    React.createElement("option", { value: "archived" }, "Архивные направления"),
-                                    React.createElement("option", { value: "all" }, "Все направления")
+                                    React.createElement("span", null, 
+                                        directionFilter === "active" ? "Действующие" :
+                                        directionFilter === "archived" ? "Архивные" : "Все"
+                                    ),
+                                    React.createElement("span", { style: { opacity: 0.6 } }, "▼")
                                 )
                             )
+                        )
                         )
                     ),
 
