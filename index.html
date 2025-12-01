@@ -4065,30 +4065,47 @@
                 setDirCreateOpen(false);
             };
             
-            const archiveDirection = (directionCode) => {
+            const toggleArchiveDirection = (directionCode) => {
                 if (!canEditDirections) {
-                    alert("❌ Недостаточно прав для архивации направлений");
+                    alert("❌ Недостаточно прав для изменения статуса направлений");
                     return;
                 }
                 
-                // Находим направление которое хотим архивировать
-                const directionToArchive = directions.find(d => d.code === directionCode);
-                if (!directionToArchive) return;
+                // Находим направление
+                const directionToToggle = directions.find(d => d.code === directionCode);
+                if (!directionToToggle) return;
                 
-                const directionName = directionToArchive.name;
+                const directionName = directionToToggle.name;
+                const isCurrentlyArchived = directionToToggle.archived || false;
                 
-                // Подтверждение архивации
-                if (confirm(`Вы уверены, что хотите архивировать направление "${directionName}"?\n\nАрхивированные направления:\n• Не показываются в основном списке\n• Не доступны для новых проектов\n• Существующие проекты сохраняют связь`)) {
-                    setDirections((prev) => {
-                        const newDirections = prev.map(d => 
-                            d.code === directionCode 
-                                ? { ...d, archived: true } 
-                                : d
-                        );
-                        saveDirections(newDirections);
-                        return newDirections;
-                    });
-                    alert("✅ Направление перемещено в архив");
+                if (isCurrentlyArchived) {
+                    // Восстановление из архива
+                    if (confirm(`Вы уверены, что хотите восстановить направление "${directionName}" из архива?\n\nВосстановленные направления:\n• Снова показываются в основном списке\n• Становятся доступными для новых проектов`)) {
+                        setDirections((prev) => {
+                            const newDirections = prev.map(d => 
+                                d.code === directionCode 
+                                    ? { ...d, archived: false } 
+                                    : d
+                            );
+                            saveDirections(newDirections);
+                            return newDirections;
+                        });
+                        alert("✅ Направление восстановлено из архива");
+                    }
+                } else {
+                    // Архивация
+                    if (confirm(`Вы уверены, что хотите архивировать направление "${directionName}"?\n\nАрхивированные направления:\n• Не показываются в основном списке\n• Не доступны для новых проектов\n• Существующие проекты сохраняют связь`)) {
+                        setDirections((prev) => {
+                            const newDirections = prev.map(d => 
+                                d.code === directionCode 
+                                    ? { ...d, archived: true } 
+                                    : d
+                            );
+                            saveDirections(newDirections);
+                            return newDirections;
+                        });
+                        alert("✅ Направление перемещено в архив");
+                    }
                 }
             };
 
@@ -4701,21 +4718,23 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                         "🏢 Проект Фонда ТИМ"
                                     )
                                 ) : canEditDirections ? 
-                                      React.createElement("div", { className: "chips" },
-                                        React.createElement("button", {
-                                          className: "btn primary",
-                                          onClick: () => onEditDirection(it),
-                                          "aria-label": "Редактировать направление"
-                                        }, "Редактировать"),
-                                        React.createElement("button", {
-                                          className: "btn",
-                                          onClick: () => archiveDirection(it.code),
-                                          "aria-label": "Архивировать направление",
-                                          style: { background: 'var(--yellow)', color: 'black' }
-                                        }, "В архив")
-                                      ) :
-                                      React.createElement("span", { className: "small" }, 
-                                        "📖 Только для просмотра"
+                                        React.createElement("div", { className: "chips" },
+                                            React.createElement("button", {
+                                                className: "btn primary",
+                                                onClick: () => onEditDirection(it),
+                                                "aria-label": "Редактировать направление"
+                                            }, "Редактировать"),
+                                            React.createElement("button", {
+                                                className: "btn",
+                                                onClick: () => toggleArchiveDirection(it.code),
+                                                "aria-label": it.archived ? "Вернуть из архива" : "В архив",
+                                                style: it.archived 
+                                                    ? { background: 'var(--green)', color: 'white' } 
+                                                    : { background: 'var(--yellow)', color: 'black' }
+                                            }, it.archived ? "Вернуть из архива" : "В архив")
+                                        ) :
+                                        React.createElement("span", { className: "small" }, 
+                                            "📖 Только для просмотра"
                                 )
                             )
                         ));
@@ -4901,21 +4920,23 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                                         "Проект Фонда ТИМ"
                                                     )    
                                                 ) : canEditDirections ? 
-                                                      React.createElement("div", { className: "chips" },
-                                                        React.createElement("button", {
-                                                          className: "btn primary",
-                                                          onClick: () => onEditDirection(it),
-                                                          "aria-label": "Редактировать"
-                                                        }, "Редактировать"),
-                                                        React.createElement("button", {
-                                                          className: "btn",
-                                                          onClick: () => archiveDirection(it.code),
-                                                          "aria-label": "Архивировать направление",
-                                                          style: { background: 'var(--yellow)', color: 'black' }
-                                                        }, "В архив")
-                                                      ) :
-                                                      React.createElement("span", { className: "small" }, 
-                                                        "Только просмотр"
+                                                        React.createElement("div", { className: "chips" },
+                                                            React.createElement("button", {
+                                                                className: "btn primary",
+                                                                onClick: () => onEditDirection(it),
+                                                                "aria-label": "Редактировать направление"
+                                                            }, "Редактировать"),
+                                                            React.createElement("button", {
+                                                                className: "btn",
+                                                                onClick: () => toggleArchiveDirection(it.code),
+                                                                "aria-label": it.archived ? "Вернуть из архива" : "В архив",
+                                                                style: it.archived 
+                                                                    ? { background: 'var(--green)', color: 'white' } 
+                                                                    : { background: 'var(--yellow)', color: 'black' }
+                                                            }, it.archived ? "Вернуть из архива" : "В архив")
+                                                        ) :
+                                                        React.createElement("span", { className: "small" }, 
+                                                            "Только просмотр"
                                                 )        
                                             )
                                         ))
