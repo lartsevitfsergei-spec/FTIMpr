@@ -1364,6 +1364,10 @@
         const LS_TOUR_KEY = "mvb_tour_dismissed_v1";
         const LS_FTIM_PROJECTS = "mvb_ftim_projects_v1";
         const LS_INSTRUCTION_KEY = "mvb_instruction_dismissed_v1";
+        const LS_DELETED_ITEMS = "mvb_deleted_items"; // Для журнала удалений
+        const MIN_CONFIRM_TEXT = "УДАЛИТЬ"; // Текст для подтверждения
+        const DELETE_TIMEOUT = 5000; // 5 секунд на отмену
+        const BATCH_DELETE_LIMIT = 10; // Максимум удалений за раз
 
 
         function tryParse(raw) {
@@ -3146,7 +3150,6 @@
             );
         }
         /* ====================== КОМПОНЕНТ ЦЕНТРАЛЬНОГО МОДАЛЬНОГО ОКНА ====================== */
-        /* ====================== КОМПОНЕНТ ЦЕНТРАЛЬНОГО МОДАЛЬНОГО ОКНА ====================== */
         function CenterModal({ open, title, onClose, headExtra, children, footLeft, footRight, ariaLabel }) {
           useEffect(() => {
             if (open) {
@@ -3191,6 +3194,183 @@
                 React.createElement("div", { style: { display: "flex", gap: "8px" } }, footRight)
               )
             )
+          );
+        }
+        
+        /* ====================== КОМПОНЕНТ ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ ====================== */
+        function DeleteConfirmationModal({ 
+          open, 
+          onClose, 
+          onConfirm, 
+          itemType, 
+          itemName, 
+          warningMessage 
+        }) {
+          const [confirmText, setConfirmText] = useState("");
+          const [step, setStep] = useState(1); // 1 - предупреждение, 2 - ввод текста
+          
+          // Сбрасываем состояние при открытии
+          useEffect(() => {
+            if (open) {
+              setConfirmText("");
+              setStep(1);
+            }
+          }, [open]);
+          
+          const getItemTypeText = () => {
+            switch(itemType) {
+              case "direction": return "направление";
+              case "project": return "проект";
+              case "ftimProject": return "проект Фонда";
+              default: return "элемент";
+            }
+          };
+          
+          const handleConfirm = () => {
+            if (step === 1) {
+              setStep(2);
+            } else {
+              if (confirmText.toUpperCase() === MIN_CONFIRM_TEXT) {
+                onConfirm();
+                onClose();
+              }
+            }
+          };
+          
+          if (!open) return null;
+          
+          return React.createElement(CenterModal, {
+            open: true,
+            onClose,
+            title: step === 1 ? "⚠️ Подтверждение удаления" : "🚨 Окончательное подтверждение",
+            "aria-label": "Подтверждение удаления",
+            footRight: React.createElement(React.Fragment, null,
+              React.createElement("button", {
+                className: "btn",
+                onClick: onClose
+              }, "Отмена"),
+              React.createElement("button", {
+                className: "btn primary",
+                onClick: handleConfirm,
+                disabled: step === 2 && confirmText.toUpperCase() !== MIN_CONFIRM_TEXT,
+                style: step === 2 && confirmText.toUpperCase() !== MIN_CONFIRM_TEXT ? 
+                  { opacity: 0.5, cursor: "not-allowed" } : {}
+              }, step === 1 ? "Далее" : "Подтвердить удаление")
+            )
+          }, 
+            step === 1 ? 
+              React.createElement("div", null,
+                React.createElement("div", { 
+                  style: { 
+                    background: "#fffbeb", 
+                    border: "1px solid #fde68a", 
+                    borderRadius: "8px", 
+                    padding: "16px", 
+                    marginBottom: "16px" 
+                  } 
+                },
+                  React.createElement("h4", { style: { marginTop: 0, color: "#f59e0b" } }, "Внимание!"),
+                  React.createElement("p", null, 
+                    "Вы собираетесь удалить ", 
+                    React.createElement("strong", null, getItemTypeText()), 
+                    ":"
+                  ),
+                  React.createElement("div", { 
+                    style: { 
+                      background: "white", 
+                      padding: "12px", 
+                      borderRadius: "6px", 
+                      margin: "12px 0", 
+                      borderLeft: "4px solid var(--accent)" 
+                    } 
+                  },
+                    React.createElement("strong", null, itemName)
+                  ),
+                  warningMessage && 
+                    React.createElement("div", { 
+                      className: "small", 
+                      style: { color: "#ef4444", marginTop: "8px" } 
+                    }, warningMessage),
+                  React.createElement("div", { className: "small", style: { marginTop: "12px" } },
+                    "Это действие:", 
+                    React.createElement("ul", { className: "list" },
+                      React.createElement("li", null, "• ", React.createElement("strong", null, "Невозможно отменить")),
+                      React.createElement("li", null, "• ", "Удалит все связанные данные"),
+                      React.createElement("li", null, "• ", "Может повлиять на статистику")
+                    )
+                  )
+                ),
+                React.createElement("div", { className: "small" },
+                  "Нажмите «Далее» для продолжения или «Отмена» для отказа."
+                )
+              ) :
+              React.createElement("div", null,
+                React.createElement("div", { 
+                  style: { 
+                    background: "#fef2f2", 
+                    border: "1px solid #fecaca", 
+                    borderRadius: "8px", 
+                    padding: "16px", 
+                    marginBottom: "16px",
+                    textAlign: "center" 
+                  } 
+                },
+                  React.createElement("div", { 
+                    style: { 
+                      fontSize: "3rem", 
+                      marginBottom: "12px" 
+                    } 
+                  }, "🚨"),
+                  React.createElement("h4", { style: { margin: "0 0 12px 0", color: "#ef4444" } }, 
+                    "Последнее предупреждение"
+                  ),
+                  React.createElement("p", null, 
+                    "Вы точно уверены, что хотите удалить ", 
+                    React.createElement("strong", null, getItemTypeText()), 
+                    " «", React.createElement("strong", null, itemName), "»?"
+                  )
+                ),
+                React.createElement("div", { className: "field-group" },
+                  React.createElement("div", { className: "label" }, 
+                    "Введите слово «УДАЛИТЬ» для подтверждения:"
+                  ),
+                  React.createElement("input", {
+                    className: "input",
+                    value: confirmText,
+                    onChange: (e) => setConfirmText(e.target.value),
+                    placeholder: "Введите УДАЛИТЬ",
+                    style: { 
+                      textAlign: "center", 
+                      fontWeight: "bold",
+                      borderColor: confirmText.toUpperCase() === MIN_CONFIRM_TEXT ? 
+                        "#10b981" : "#ef4444"
+                    }
+                  }),
+                  React.createElement("div", { 
+                    className: "small", 
+                    style: { 
+                      marginTop: "8px",
+                      color: confirmText.toUpperCase() === MIN_CONFIRM_TEXT ? 
+                        "#10b981" : "#64748b"
+                    } 
+                  },
+                    confirmText.toUpperCase() === MIN_CONFIRM_TEXT ? 
+                      "✅ Правильно. Теперь можно подтвердить удаление." :
+                      "⚠️ Введите слово «УДАЛИТЬ» в верхнем регистре"
+                  )
+                ),
+                React.createElement("div", { 
+                  className: "small", 
+                  style: { 
+                    background: "#f1f5f9", 
+                    padding: "12px", 
+                    borderRadius: "6px",
+                    marginTop: "16px" 
+                  } 
+                },
+                  "После подтверждения удаление произойдет мгновенно и без возможности восстановления."
+                )
+              )
           );
         }
         /* ====================== Direction: редактор ====================== */
@@ -4268,6 +4448,142 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                     return true;
                 }
             });
+            // Состояние для удаления
+            const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+            const [itemToDelete, setItemToDelete] = useState(null);
+            const [deletedItemsLog, setDeletedItemsLog] = useState(() => {
+              try {
+                const saved = localStorage.getItem(LS_DELETED_ITEMS);
+                return saved ? JSON.parse(saved) : [];
+              } catch {
+                return [];
+              }
+            });
+            /* ====================== ФУНКЦИИ УДАЛЕНИЯ ====================== */
+
+            // Функция для логирования удаления
+            const logDeletion = (itemType, itemName, itemId) => {
+              const newLog = [...deletedItemsLog, {
+                type: itemType,
+                name: itemName,
+                id: itemId,
+                deletedBy: currentUser?.name || "Неизвестно",
+                deletedAt: new Date().toISOString(),
+                timestamp: Date.now()
+              }];
+              
+              // Храним только последние 50 удалений
+              const trimmedLog = newLog.slice(-50);
+              setDeletedItemsLog(trimmedLog);
+              
+              try {
+                localStorage.setItem(LS_DELETED_ITEMS, JSON.stringify(trimmedLog));
+              } catch (error) {
+                console.error("Не удалось сохранить журнал удалений:", error);
+              }
+            };
+            
+            // Функция удаления направления
+            const handleDeleteDirection = (directionCode) => {
+              if (!canEditDirections) {
+                alert("❌ Недостаточно прав для удаления направлений");
+                return;
+              }
+              
+              const direction = directions.find(d => d.code === directionCode);
+              if (!direction) return;
+              
+              // Проверяем, есть ли проекты в этом направлении
+              const projectsInDirection = projects.filter(p => p.directionName === direction.name);
+              const ftimProjectsInDirection = ftimProjects.filter(p => p.directionName === direction.name);
+              
+              let warningMessage = "";
+              if (projectsInDirection.length > 0 || ftimProjectsInDirection.length > 0) {
+                warningMessage = `⚠️ В этом направлении есть ${projectsInDirection.length} проектов и ${ftimProjectsInDirection.length} проектов Фонда. Они останутся без направления.`;
+              }
+              
+              setItemToDelete({
+                type: "direction",
+                code: directionCode,
+                name: direction.name,
+                warning: warningMessage
+              });
+              setDeleteModalOpen(true);
+            };
+            
+            // Функция удаления проекта
+            const handleDeleteProject = (projectId) => {
+              if (!canEditProjects) {
+                alert("❌ Недостаточно прав для удаления проектов");
+                return;
+              }
+              
+              const project = projects.find(p => p.id === projectId);
+              if (!project) return;
+              
+              setItemToDelete({
+                type: "project",
+                id: projectId,
+                name: project.title || "Без названия"
+              });
+              setDeleteModalOpen(true);
+            };
+            
+            // Функция удаления проекта Фонда
+            const handleDeleteFTIMProject = (projectId) => {
+              if (!canEditFTIMProjects) {
+                alert("❌ Недостаточно прав для удаления проектов Фонда");
+                return;
+              }
+              
+              const project = ftimProjects.find(p => p.id === projectId);
+              if (!project) return;
+              
+              setItemToDelete({
+                type: "ftimProject",
+                id: projectId,
+                name: project.projectName || "Без названия"
+              });
+              setDeleteModalOpen(true);
+            };
+            
+            // Фактическое удаление после подтверждения
+            const confirmDelete = () => {
+              if (!itemToDelete) return;
+              
+              switch (itemToDelete.type) {
+                case "direction":
+                  // Удаляем направление
+                  const newDirections = directions.filter(d => d.code !== itemToDelete.code);
+                  setDirections(newDirections);
+                  saveDirections(newDirections);
+                  logDeletion("direction", itemToDelete.name, itemToDelete.code);
+                  break;
+                  
+                case "project":
+                  // Удаляем проект
+                  const newProjects = projects.filter(p => p.id !== itemToDelete.id);
+                  setProjects(newProjects);
+                  saveProjects(newProjects);
+                  logDeletion("project", itemToDelete.name, itemToDelete.id);
+                  break;
+                  
+                case "ftimProject":
+                  // Удаляем проект Фонда
+                  const newFTIMProjects = ftimProjects.filter(p => p.id !== itemToDelete.id);
+                  setFtimProjects(newFTIMProjects);
+                  saveFTIMProjects(newFTIMProjects);
+                  logDeletion("ftimProject", itemToDelete.name, itemToDelete.id);
+                  break;
+              }
+              
+              // Показываем уведомление
+              alert(`✅ Успешно удалено: ${itemToDelete.name}`);
+              
+              // Сбрасываем состояние
+              setDeleteModalOpen(false);
+              setItemToDelete(null);
+            };
             const dismissTour = () => {
                 try {
                     localStorage.setItem(LS_TOUR_KEY, "1");
@@ -4701,40 +5017,75 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                         onClick: () => onEditProject(it),
                                         "aria-label": "Редактировать проект"
                                     }, "Редактировать")
-                                ) : isFTIMProject ? (canEditFTIMProjects ? 
-                                    React.createElement(React.Fragment, null,
+                                ) : isProject ? React.createElement(React.Fragment, null,
+                                      React.createElement("button", {
+                                        className: "btn",
+                                        onClick: () => openFit(it),
+                                        "aria-label": "Fit-Check"
+                                      }, "Fit-Check"),
+                                      React.createElement("button", {
+                                        className: "btn primary",
+                                        onClick: () => onEditProject(it),
+                                        "aria-label": "Редактировать проект"
+                                      }, "Редактировать"),
+                                      // ДОБАВЬТЕ ЭТУ КНОПКУ:
+                                      canEditProjects && React.createElement("button", {
+                                        className: "btn",
+                                        onClick: () => handleDeleteProject(it.id),
+                                        "aria-label": "Удалить проект",
+                                        style: { 
+                                          background: 'var(--red)', 
+                                          color: 'white',
+                                          marginLeft: '4px'
+                                        }
+                                      }, "🗑️ Удалить")
+                                    ) : isFTIMProject ? (canEditFTIMProjects ? 
+                                      React.createElement(React.Fragment, null,
+                                        // ИЗМЕНИТЕ ЭТУ СУЩЕСТВУЮЩУЮ КНОПКУ:
                                         React.createElement("button", {
-                                            className: "btn",
-                                            onClick: () => deleteFTIMProject(it.id),
-                                            "aria-label": "Удалить проект"
-                                        }, "Удалить"),
+                                          className: "btn",
+                                          onClick: () => handleDeleteFTIMProject(it.id), // ИЗМЕНИЛИ ФУНКЦИЮ
+                                          "aria-label": "Удалить проект",
+                                          style: { background: 'var(--red)', color: 'white' }
+                                        }, "🗑️ Удалить"),
                                         React.createElement("button", {
-                                            className: "btn primary",
-                                            onClick: () => onEditFTIMProject(it),
-                                            "aria-label": "Редактировать проект"
+                                          className: "btn primary",
+                                          onClick: () => onEditFTIMProject(it),
+                                          "aria-label": "Редактировать проект"
                                         }, "Редактировать")
-                                    ) :
-                                    React.createElement("span", { className: "small" }, 
+                                      ) :
+                                      React.createElement("span", { className: "small" }, 
                                         "🏢 Проект Фонда ТИМ"
-                                    )
-                                ) : canEditDirections ? 
+                                      )
+                                    ) : canEditDirections ? 
                                         React.createElement("div", { className: "chips" },
-                                            React.createElement("button", {
-                                                className: "btn primary",
-                                                onClick: () => onEditDirection(it),
-                                                "aria-label": "Редактировать направление"
-                                            }, "Редактировать"),
-                                            React.createElement("button", {
-                                                className: "btn",
-                                                onClick: () => toggleArchiveDirection(it.code),
-                                                "aria-label": it.archived ? "Вернуть из архива" : "В архив",
-                                                style: it.archived 
-                                                    ? { background: 'var(--green)', color: 'white' } 
-                                                    : { background: 'var(--yellow)', color: 'black' }
-                                            }, it.archived ? "Вернуть из архива" : "В архив")
+                                          React.createElement("button", {
+                                            className: "btn primary",
+                                            onClick: () => onEditDirection(it),
+                                            "aria-label": "Редактировать направление"
+                                          }, "Редактировать"),
+                                          React.createElement("button", {
+                                            className: "btn",
+                                            onClick: () => toggleArchiveDirection(it.code),
+                                            "aria-label": it.archived ? "Вернуть из архива" : "В архив",
+                                            style: it.archived 
+                                              ? { background: 'var(--green)', color: 'white' } 
+                                              : { background: 'var(--yellow)', color: 'black' }
+                                          }, it.archived ? "Вернуть из архива" : "В архив"),
+                                          // ДОБАВЬТЕ ЭТУ КНОПКУ:
+                                          React.createElement("button", {
+                                            className: "btn",
+                                            onClick: () => handleDeleteDirection(it.code),
+                                            "aria-label": "Удалить направление",
+                                            style: { 
+                                              background: 'var(--red)', 
+                                              color: 'white',
+                                              marginLeft: '4px'
+                                            }
+                                          }, "🗑️ Удалить")
                                         ) :
                                         React.createElement("span", { className: "small" }, 
-                                            "📖 Только для просмотра"
+                                          "📖 Только для просмотра"
                                 )
                             )
                         ));
@@ -4893,50 +5244,73 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                         React.createElement("td", null,
                                             React.createElement("div", { className: "chips" },
                                                 it.type === "project" ? React.createElement(React.Fragment, null,
-                                                    React.createElement("button", {
-                                                        className: "btn",
-                                                        onClick: () => openFit(it),
-                                                        "aria-label": "Fit-Check"
-                                                    }, "Fit-Check"),
-                                                    React.createElement("button", {
-                                                        className: "btn primary",
-                                                        onClick: () => onEditProject(it),
-                                                        "aria-label": "Редактировать проект"
-                                                    }, "Редактировать")
+                                                  React.createElement("button", {
+                                                    className: "btn",
+                                                    onClick: () => openFit(it),
+                                                    "aria-label": "Fit-Check"
+                                                  }, "Fit-Check"),
+                                                  React.createElement("button", {
+                                                    className: "btn primary",
+                                                    onClick: () => onEditProject(it),
+                                                    "aria-label": "Редактировать проект"
+                                                  }, "Редактировать"),
+                                                  // ДОБАВЬТЕ ЭТУ КНОПКУ:
+                                                  canEditProjects && React.createElement("button", {
+                                                    className: "btn",
+                                                    onClick: () => handleDeleteProject(it.id),
+                                                    "aria-label": "Удалить проект",
+                                                    style: { 
+                                                      background: 'var(--red)', 
+                                                      color: 'white',
+                                                      marginLeft: '8px'
+                                                    }
+                                                  }, "🗑️ Удалить")
                                                 ) : it.type === "ftimProject" ? (canEditFTIMProjects ? 
-                                                    React.createElement(React.Fragment, null,
+                                                      React.createElement(React.Fragment, null,
                                                         React.createElement("button", {
-                                                            className: "btn",
-                                                            onClick: () => deleteFTIMProject(it.id),
-                                                            "aria-label": "Удалить проект"
-                                                        }, "Удалить"),
+                                                          className: "btn",
+                                                          onClick: () => handleDeleteFTIMProject(it.id), // ИЗМЕНИТЕ ФУНКЦИЮ
+                                                          "aria-label": "Удалить проект",
+                                                          style: { background: 'var(--red)', color: 'white' }
+                                                        }, "🗑️ Удалить"),
                                                         React.createElement("button", {
-                                                            className: "btn primary",
-                                                            onClick: () => onEditFTIMProject(it),
-                                                            "aria-label": "Редактировать проект"
+                                                          className: "btn primary",
+                                                          onClick: () => onEditFTIMProject(it),
+                                                          "aria-label": "Редактировать проект"
                                                         }, "Редактировать")
                                                     ) :
                                                     React.createElement("span", { className: "small" }, 
                                                         "Проект Фонда ТИМ"
                                                     )    
                                                 ) : canEditDirections ? 
-                                                        React.createElement("div", { className: "chips" },
-                                                            React.createElement("button", {
-                                                                className: "btn primary",
-                                                                onClick: () => onEditDirection(it),
-                                                                "aria-label": "Редактировать направление"
-                                                            }, "Редактировать"),
-                                                            React.createElement("button", {
-                                                                className: "btn",
-                                                                onClick: () => toggleArchiveDirection(it.code),
-                                                                "aria-label": it.archived ? "Вернуть из архива" : "В архив",
-                                                                style: it.archived 
-                                                                    ? { background: 'var(--green)', color: 'white' } 
-                                                                    : { background: 'var(--yellow)', color: 'black' }
-                                                            }, it.archived ? "Вернуть из архива" : "В архив")
-                                                        ) :
-                                                        React.createElement("span", { className: "small" }, 
-                                                            "Только просмотр"
+                                                    React.createElement("div", { className: "chips" },
+                                                      React.createElement("button", {
+                                                        className: "btn primary",
+                                                        onClick: () => onEditDirection(it),
+                                                        "aria-label": "Редактировать направление"
+                                                      }, "Редактировать"),
+                                                      React.createElement("button", {
+                                                        className: "btn",
+                                                        onClick: () => toggleArchiveDirection(it.code),
+                                                        "aria-label": it.archived ? "Вернуть из архива" : "В архив",
+                                                        style: it.archived 
+                                                          ? { background: 'var(--green)', color: 'white' } 
+                                                          : { background: 'var(--yellow)', color: 'black' }
+                                                      }, it.archived ? "Вернуть из архива" : "В архив"),
+                                                      // ДОБАВЬТЕ ЭТУ КНОПКУ:
+                                                      React.createElement("button", {
+                                                        className: "btn",
+                                                        onClick: () => handleDeleteDirection(it.code),
+                                                        "aria-label": "Удалить направление",
+                                                        style: { 
+                                                          background: 'var(--red)', 
+                                                          color: 'white',
+                                                          marginLeft: '4px'
+                                                        }
+                                                      }, "🗑️ Удалить")
+                                                    ) :
+                                                    React.createElement("span", { className: "small" }, 
+                                                      "📖 Только для просмотра"
                                                 )        
                                             )
                                         ))
@@ -5009,6 +5383,19 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                         }
                         setManualInstructionOpen(false);
                     }
+                }),
+                
+                // Модальное окно подтверждения удаления - ДОБАВЛЯЕМ ЭТО
+                React.createElement(DeleteConfirmationModal, {
+                  open: deleteModalOpen,
+                  onClose: () => {
+                    setDeleteModalOpen(false);
+                    setItemToDelete(null);
+                  },
+                  onConfirm: confirmDelete,
+                  itemType: itemToDelete?.type,
+                  itemName: itemToDelete?.name,
+                  warningMessage: itemToDelete?.warning
                 }),
                 // Добавляем модальное окно входа
                 React.createElement(LoginModal, {
@@ -5510,7 +5897,9 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                 cloudData,
                 onDataRefresh: () => loadCloudData(true)
             });
+            
         }
+        
         // ====================== ЗАПУСК ПРИЛОЖЕНИЯ ======================
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(React.createElement(DirectionsDashboardFixedWithCloud));
