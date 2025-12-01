@@ -3838,21 +3838,24 @@
                 if (dataset === "directions") {
                     let filteredDirections = Array.isArray(directions) ? directions : [];
                     
-                    // Фильтрация по статусу (для всех пользователей)
-                    if (directionFilter === "active") {
-                        filteredDirections = filteredDirections.filter(d => !d.archived);
-                    } else if (directionFilter === "archived") {
-                        filteredDirections = filteredDirections.filter(d => d.archived);
+                    // 1. Сначала применяем фильтр (для сотрудников Фонда)
+                    if (currentUser?.role === USER_ROLES.FOUNDATION) {
+                        if (directionFilter === "active") {
+                            filteredDirections = filteredDirections.filter(d => !d.archived);
+                        } else if (directionFilter === "archived") {
+                            filteredDirections = filteredDirections.filter(d => d.archived);
+                        }
+                        // "all" - не фильтруем, оставляем все
                     }
-                    // "all" - не фильтруем
                     
-                    // Дополнительная фильтрация для участников (скрываем архивные полностью)
+                    // 2. Для участников ВСЕГДА показываем только активные
                     if (currentUser?.role === USER_ROLES.PARTICIPANT) {
                         filteredDirections = filteredDirections.filter(d => !d.archived);
                     }
                     
                     return filteredDirections.map((d) => ({ type: "direction", ...d }));
                 }
+
                 else if (dataset === "projects") {
                     let filteredProjects = Array.isArray(projects) ? projects : [];
                     
@@ -3892,7 +3895,7 @@
                     }));
                 }
                 return [];
-            }, [dataset, directions, projects, ftimProjects, currentUser]);
+            }, [dataset, directions, projects, ftimProjects, currentUser, directionFilter]);
 
             const filtered = useMemo(() => {
                 const s = debouncedSearch.trim().toLowerCase();
@@ -4329,8 +4332,16 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                             React.createElement("span", { className: "status-count" }, 
                                 directions.filter(d => d.archived).length
                             )
+                        ),    
+                        currentUser?.role === USER_ROLES.FOUNDATION && 
+                        React.createElement("div", { className: "status-item" },
+                            React.createElement("span", { className: "small" }, "Фильтр:"),
+                            React.createElement("span", { className: "status-count" }, 
+                                directionFilter === "active" ? "Действующие" :
+                                directionFilter === "archived" ? "Архивные" : "Все"
+                            )
                         )
-                    ) :
+                    ) : 
                     // Для других вкладок - обычный счетчик
                     React.createElement("div", { className: "status-item" },
                         React.createElement("span", { className: "small" }, "Всего:"),
@@ -4387,15 +4398,35 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                 setValues: setFilterTags
                             }), // ← ДОБАВЛЕНА ЗАПЯТАЯ ЗДЕСЬ!
                             dataset === "directions" && currentUser?.role === USER_ROLES.FOUNDATION && 
-                            React.createElement("select", {
-                                className: "select",
-                                value: directionFilter,
-                                onChange: (e) => setDirectionFilter(e.target.value),
-                                style: { minWidth: '180px' }
+                            React.createElement("div", { 
+                                style: { 
+                                    display: "flex", 
+                                    alignItems: "center", 
+                                    gap: "8px",
+                                    border: "1px solid var(--border)",
+                                    borderRadius: "8px",
+                                    padding: "0 12px",
+                                    background: "white"
+                                }
                             },
-                                React.createElement("option", { value: "active" }, "Действующие"),
-                                React.createElement("option", { value: "archived" }, "В архиве"),
-                                React.createElement("option", { value: "all" }, "Все направления")
+                                React.createElement("span", { 
+                                    className: "small",
+                                    style: { whiteSpace: "nowrap" }
+                                }, "Показывать:"),
+                                React.createElement("select", {
+                                    className: "select",
+                                    value: directionFilter,
+                                    onChange: (e) => setDirectionFilter(e.target.value),
+                                    style: { 
+                                        border: "none",
+                                        background: "transparent",
+                                        padding: "8px 0"
+                                    }
+                                },
+                                    React.createElement("option", { value: "active" }, "Действующие направления"),
+                                    React.createElement("option", { value: "archived" }, "Архивные направления"),
+                                    React.createElement("option", { value: "all" }, "Все направления")
+                                )
                             )
                         )
                     ),
@@ -4796,9 +4827,35 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
                                             )
                                         ),
                                         React.createElement("td", null, 
-                                            it.type === "project" ? it.directionName || "—" : 
-                                            it.type === "ftimProject" ? it.directionName || "—" :
-                                            it.name),
+                                            it.type === "project" ? 
+                                                React.createElement("div", null,
+                                                    it.directionName || "—",
+                                                    directions.find(d => d.name === it.directionName)?.archived && 
+                                                    React.createElement(Badge, { 
+                                                        kind: "muted", 
+                                                        style: { marginLeft: 8, fontSize: "10px" },
+                                                        title: "Направление в архиве"
+                                                    }, "Архив")
+                                                ) : 
+                                            it.type === "ftimProject" ? 
+                                                React.createElement("div", null,
+                                                    it.directionName || "—",
+                                                    directions.find(d => d.name === it.directionName)?.archived && 
+                                                    React.createElement(Badge, { 
+                                                        kind: "muted", 
+                                                        style: { marginLeft: 8, fontSize: "10px" },
+                                                        title: "Направление в архиве"
+                                                    }, "Архив")
+                                                ) :
+                                            React.createElement("div", null,
+                                                it.name,
+                                                it.archived && React.createElement(Badge, { 
+                                                    kind: "muted", 
+                                                    style: { marginLeft: 8, fontSize: "10px" },
+                                                    title: "Направление в архиве"
+                                                }, "Архив")
+                                            )
+                                        ),
                                         // НОВЫЙ СТОЛБЕЦ: Соответствие кейсу
                                         dataset === "projects" && React.createElement("td", null,
                                             it.selectedOpenCase ? 
