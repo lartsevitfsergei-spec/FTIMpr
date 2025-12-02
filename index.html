@@ -1485,28 +1485,237 @@
         }
 
         function saveDirections(arr) {
+            console.log("💾 [saveDirections] Сохранение направлений, количество:", arr?.length || 0);
+            
+            // Проверяем валидность данных
+            if (!Array.isArray(arr)) {
+                console.error("❌ [saveDirections] Передан не массив:", arr);
+                alert("Критическая ошибка: данные направлений повреждены!");
+                return false;
+            }
+            
             try {
-                localStorage.setItem(LS_DIRECTIONS_V3, JSON.stringify(arr));
-            } catch {}
+                // 1. Создаем резервную копию текущих данных
+                const currentData = localStorage.getItem(LS_DIRECTIONS_V3);
+                const timestamp = Date.now();
+                
+                if (currentData) {
+                    localStorage.setItem(`${LS_DIRECTIONS_V3}_backup_${timestamp}`, currentData);
+                    console.log("📦 [saveDirections] Создана резервная копия направлений");
+                }
+                
+                // 2. Очищаем старые резервные копии (оставляем последние 3)
+                const backupKeys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith(`${LS_DIRECTIONS_V3}_backup_`)) {
+                        backupKeys.push(key);
+                    }
+                }
+                
+                if (backupKeys.length > 3) {
+                    backupKeys.sort(); // сортируем по времени (самые старые первыми)
+                    const toRemove = backupKeys.slice(0, backupKeys.length - 3);
+                    toRemove.forEach(key => {
+                        localStorage.removeItem(key);
+                        console.log("🗑️ [saveDirections] Удалена старая резервная копия:", key);
+                    });
+                }
+                
+                // 3. Сохраняем новые данные
+                const dataToSave = JSON.stringify(arr);
+                localStorage.setItem(LS_DIRECTIONS_V3, dataToSave);
+                
+                console.log("✅ [saveDirections] Направления успешно сохранены, размер:", dataToSave.length, "байт");
+                return true;
+                
+            } catch (error) {
+                console.error("❌ [saveDirections] Ошибка сохранения направлений:", error);
+                
+                // Пытаемся сохранить хотя бы в sessionStorage
+                try {
+                    sessionStorage.setItem(LS_DIRECTIONS_V3 + "_emergency", JSON.stringify(arr));
+                    console.log("🚨 [saveDirections] Экстренная копия сохранена в sessionStorage");
+                } catch (e) {
+                    console.error("❌ [saveDirections] Не удалось сохранить даже в sessionStorage:", e);
+                }
+                
+                return false;
+            }
         }
 
         function loadDirections() {
+            console.log("📂 [loadDirections] Загрузка направлений...");
             migrateV2toV3();
+            
+            let primaryData = null;
+            let backupData = null;
+            let emergencyData = null;
+            
             try {
+                // 1. Пробуем загрузить основные данные
                 const raw = localStorage.getItem(LS_DIRECTIONS_V3);
                 if (raw) {
-                    const arr = JSON.parse(raw);
-                    if (Array.isArray(arr) && arr.length > 0) return arr;
+                    primaryData = JSON.parse(raw);
+                    console.log("✅ [loadDirections] Основные данные загружены, записей:", primaryData?.length || 0);
                 }
-            } catch {}
-            localStorage.setItem(LS_DIRECTIONS_V3, JSON.stringify(INITIAL_DIRECTIONS));
-            return INITIAL_DIRECTIONS;
+                
+                // 2. Проверяем целостность данных
+                if (!primaryData || !Array.isArray(primaryData)) {
+                    console.warn("⚠️ [loadDirections] Основные данные повреждены или отсутствуют");
+                    
+                    // 3. Ищем самую свежую резервную копию
+                    const backupKeys = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key.startsWith(`${LS_DIRECTIONS_V3}_backup_`)) {
+                            backupKeys.push(key);
+                        }
+                    }
+                    
+                    if (backupKeys.length > 0) {
+                        // Берем самую свежую резервную копию (по времени в названии)
+                        backupKeys.sort((a, b) => {
+                            const timeA = parseInt(a.split('_').pop());
+                            const timeB = parseInt(b.split('_').pop());
+                            return timeB - timeA;
+                        });
+                        
+                        const latestBackupKey = backupKeys[0];
+                        const backupRaw = localStorage.getItem(latestBackupKey);
+                        if (backupRaw) {
+                            backupData = JSON.parse(backupRaw);
+                            console.log("🔄 [loadDirections] Загружены данные из резервной копии:", latestBackupKey);
+                        }
+                    }
+                    
+                    // 4. Проверяем sessionStorage на наличие экстренной копии
+                    const emergencyRaw = sessionStorage.getItem(LS_DIRECTIONS_V3 + "_emergency");
+                    if (emergencyRaw) {
+                        emergencyData = JSON.parse(emergencyRaw);
+                        console.log("🚨 [loadDirections] Загружены данные из экстренной копии sessionStorage");
+                    }
+                }
+                
+                // 5. Выбираем источник данных в порядке приоритета
+                let result = primaryData;
+                
+                if (!result || !Array.isArray(result) || result.length === 0) {
+                    if (backupData && Array.isArray(backupData) && backupData.length > 0) {
+                        console.log("🔄 [loadDirections] Восстанавливаем из резервной копии");
+                        result = backupData;
+                        // Восстанавливаем основную копию
+                        try {
+                            localStorage.setItem(LS_DIRECTIONS_V3, JSON.stringify(result));
+                            console.log("💾 [loadDirections] Основные данные восстановлены из резервной копии");
+                        } catch (error) {
+                            console.error("❌ [loadDirections] Не удалось восстановить основные данные:", error);
+                        }
+                    } else if (emergencyData && Array.isArray(emergencyData) && emergencyData.length > 0) {
+                        console.log("🚨 [loadDirections] Используем экстренную копию");
+                        result = emergencyData;
+                    } else {
+                        console.log("🆕 [loadDirections] Нет данных, загружаем начальные направления");
+                        result = INITIAL_DIRECTIONS;
+                        localStorage.setItem(LS_DIRECTIONS_V3, JSON.stringify(result));
+                    }
+                }
+                
+                // 6. Гарантируем наличие поля archived
+                result = result.map(dir => ({
+                    ...dir,
+                    archived: dir.archived || false
+                }));
+                
+                console.log("✅ [loadDirections] Загружено направлений:", result.length);
+                return result;
+                
+            } catch (error) {
+                console.error("❌ [loadDirections] Критическая ошибка загрузки направлений:", error);
+                
+                // В случае полного краха возвращаем начальные данные
+                console.log("🆕 [loadDirections] Возвращаем начальные направления из-за ошибки");
+                return INITIAL_DIRECTIONS;
+            }
         }
 
         function saveProjects(arr) {
+            console.log("💾 [saveProjects] Сохранение проектов, количество:", arr?.length || 0);
+            
+            // Проверяем валидность данных
+            if (!Array.isArray(arr)) {
+                console.error("❌ [saveProjects] Передан не массив:", arr);
+                alert("Критическая ошибка: данные проектов повреждены!");
+                return false;
+            }
+            
             try {
-                localStorage.setItem(LS_PROJECTS_V3, JSON.stringify(arr));
-            } catch {}
+                // 1. Создаем резервную копию текущих данных
+                const currentData = localStorage.getItem(LS_PROJECTS_V3);
+                const timestamp = Date.now();
+                
+                if (currentData) {
+                    localStorage.setItem(`${LS_PROJECTS_V3}_backup_${timestamp}`, currentData);
+                    console.log("📦 [saveProjects] Создана резервная копия проектов");
+                }
+                
+                // 2. Очищаем старые резервные копии (оставляем последние 5)
+                const backupKeys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith(`${LS_PROJECTS_V3}_backup_`)) {
+                        backupKeys.push(key);
+                    }
+                }
+                
+                if (backupKeys.length > 5) {
+                    backupKeys.sort();
+                    const toRemove = backupKeys.slice(0, backupKeys.length - 5);
+                    toRemove.forEach(key => {
+                        localStorage.removeItem(key);
+                        console.log("🗑️ [saveProjects] Удалена старая резервная копия:", key);
+                    });
+                }
+                
+                // 3. Сохраняем новые данные с проверкой каждого проекта
+                const validatedArr = arr.map(project => {
+                    // Гарантируем наличие обязательных полей
+                    return {
+                        id: project.id || uuid(),
+                        title: project.title || "Без названия",
+                        teamName: project.teamName || "",
+                        customer: project.customer || "",
+                        directionName: project.directionName || "",
+                        status: project.status || "черновик",
+                        updatedAt: project.updatedAt || new Date().toISOString(),
+                        ...project
+                    };
+                });
+                
+                const dataToSave = JSON.stringify(validatedArr);
+                localStorage.setItem(LS_PROJECTS_V3, dataToSave);
+                
+                console.log("✅ [saveProjects] Проекты успешно сохранены, размер:", dataToSave.length, "байт");
+                return true;
+                
+            } catch (error) {
+                console.error("❌ [saveProjects] Ошибка сохранения проектов:", error);
+                
+                // Пытаемся понять причину ошибки
+                if (error.name === 'QuotaExceededError') {
+                    alert("⚠️ Закончилось место в локальном хранилище. Удалите старые проекты или экспортируйте их.");
+                }
+                
+                // Пытаемся сохранить хотя бы в sessionStorage
+                try {
+                    sessionStorage.setItem(LS_PROJECTS_V3 + "_emergency", JSON.stringify(arr.slice(0, 10))); // Сохраняем только первые 10
+                    console.log("🚨 [saveProjects] Экстренная копия (первые 10 проектов) сохранена в sessionStorage");
+                } catch (e) {
+                    console.error("❌ [saveProjects] Не удалось сохранить даже в sessionStorage:", e);
+                }
+                
+                return false;
+            }
         }
 
         /* ====================== Утилиты ====================== */
@@ -1807,6 +2016,8 @@
                 pilotReadiness: typeof p.pilotReadiness === "number" ? p.pilotReadiness : 0,
                 ideaAdequacy: typeof p.ideaAdequacy === "number" ? p.ideaAdequacy : 0,
                 status: p.status === "черновик" ? "черновик" : "готов",
+                // ВАЖНОЕ ДОБАВЛЕНИЕ: временная метка последнего обновления
+                lastUpdated: p.lastUpdated || new Date().toISOString(),
             };
             // Поддерживаем актуальность расчетов
             projBase.fitScore = computeFitScore(projBase, safeDirections);
@@ -1830,38 +2041,478 @@
         }
 
         function loadProjects() {
+            console.log("📂 [loadProjects] Загрузка проектов...");
             migrateV2toV3();
+            
+            let primaryData = null;
+            let backupData = null;
+            let emergencyData = null;
+            
             try {
+                // 1. Пробуем загрузить основные данные
                 const raw = localStorage.getItem(LS_PROJECTS_V3);
                 if (raw) {
-                    const arr = JSON.parse(raw);
-                    if (Array.isArray(arr)) {
-                        const dirs = loadDirections(); // для нормализации
-                        return arr.map((p) => normalizeProject(p, dirs));
+                    try {
+                        primaryData = JSON.parse(raw);
+                        console.log("✅ [loadProjects] Основные данные загружены, записей:", primaryData?.length || 0);
+                    } catch (parseError) {
+                        console.error("❌ [loadProjects] Ошибка парсинга JSON из localStorage:", parseError);
+                        primaryData = null;
                     }
                 }
-            } catch {}
-            localStorage.setItem(LS_PROJECTS_V3, JSON.stringify([]));
-            return [];
+                
+                // 2. Проверяем целостность данных
+                let dataIsValid = false;
+                if (primaryData && Array.isArray(primaryData)) {
+                    // Проверяем первые несколько элементов на наличие обязательных полей
+                    const sampleSize = Math.min(3, primaryData.length);
+                    let validCount = 0;
+                    
+                    for (let i = 0; i < sampleSize; i++) {
+                        const project = primaryData[i];
+                        if (project && typeof project === 'object' && project.id && project.title) {
+                            validCount++;
+                        }
+                    }
+                    
+                    dataIsValid = validCount === sampleSize || (sampleSize === 0 && primaryData.length === 0);
+                }
+                
+                if (!dataIsValid) {
+                    console.warn("⚠️ [loadProjects] Основные данные повреждены или невалидны");
+                    
+                    // 3. Ищем самую свежую резервную копию
+                    const backupKeys = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key.startsWith(`${LS_PROJECTS_V3}_backup_`)) {
+                            backupKeys.push(key);
+                        }
+                    }
+                    
+                    if (backupKeys.length > 0) {
+                        // Берем самую свежую резервную копию
+                        backupKeys.sort((a, b) => {
+                            const timeA = parseInt(a.split('_').pop());
+                            const timeB = parseInt(b.split('_').pop());
+                            return timeB - timeA;
+                        });
+                        
+                        const latestBackupKey = backupKeys[0];
+                        try {
+                            const backupRaw = localStorage.getItem(latestBackupKey);
+                            if (backupRaw) {
+                                backupData = JSON.parse(backupRaw);
+                                console.log("🔄 [loadProjects] Загружены данные из резервной копии:", latestBackupKey, "записей:", backupData?.length || 0);
+                            }
+                        } catch (backupError) {
+                            console.error("❌ [loadProjects] Ошибка загрузки резервной копии:", backupError);
+                        }
+                    }
+                    
+                    // 4. Проверяем sessionStorage на наличие экстренной копии
+                    const emergencyRaw = sessionStorage.getItem(LS_PROJECTS_V3 + "_emergency");
+                    if (emergencyRaw) {
+                        try {
+                            emergencyData = JSON.parse(emergencyRaw);
+                            console.log("🚨 [loadProjects] Загружены данные из экстренной копии sessionStorage, записей:", emergencyData?.length || 0);
+                        } catch (emergencyError) {
+                            console.error("❌ [loadProjects] Ошибка парсинга экстренной копии:", emergencyError);
+                        }
+                    }
+                    
+                    // 5. Также проверяем экстренные копии отдельных проектов
+                    const emergencyProjectKeys = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key.startsWith(`${LS_PROJECTS_V3}_emergency_`)) {
+                            emergencyProjectKeys.push(key);
+                        }
+                    }
+                    
+                    if (emergencyProjectKeys.length > 0 && (!backupData || backupData.length === 0)) {
+                        console.log("🚨 [loadProjects] Найдены экстренные копии отдельных проектов:", emergencyProjectKeys.length);
+                        const emergencyProjects = [];
+                        
+                        emergencyProjectKeys.forEach(key => {
+                            try {
+                                const projectRaw = localStorage.getItem(key);
+                                if (projectRaw) {
+                                    const project = JSON.parse(projectRaw);
+                                    if (project && project.id) {
+                                        emergencyProjects.push(project);
+                                    }
+                                }
+                            } catch (e) {
+                                console.error(`❌ [loadProjects] Ошибка загрузки экстренного проекта ${key}:`, e);
+                            }
+                        });
+                        
+                        if (emergencyProjects.length > 0) {
+                            emergencyData = emergencyData || [];
+                            emergencyData = [...emergencyData, ...emergencyProjects];
+                            console.log("🔄 [loadProjects] Добавлены экстренные проекты, всего:", emergencyData.length);
+                        }
+                    }
+                }
+                
+                // 6. Выбираем источник данных в порядке приоритета
+                let result = dataIsValid ? primaryData : null;
+                
+                if (!result || !Array.isArray(result) || result.length === 0) {
+                    if (backupData && Array.isArray(backupData) && backupData.length > 0) {
+                        console.log("🔄 [loadProjects] Восстанавливаем из резервной копии");
+                        result = backupData;
+                        
+                        // Пытаемся восстановить основную копию
+                        try {
+                            localStorage.setItem(LS_PROJECTS_V3, JSON.stringify(result));
+                            console.log("💾 [loadProjects] Основные данные восстановлены из резервной копии");
+                            
+                            // Очищаем экстренные копии, так как данные восстановлены
+                            try {
+                                sessionStorage.removeItem(LS_PROJECTS_V3 + "_emergency");
+                                console.log("🧹 [loadProjects] Экстренная копия sessionStorage очищена");
+                            } catch (e) {
+                                // Игнорируем ошибки очистки
+                            }
+                        } catch (saveError) {
+                            console.error("❌ [loadProjects] Не удалось восстановить основные данные:", saveError);
+                        }
+                    } else if (emergencyData && Array.isArray(emergencyData) && emergencyData.length > 0) {
+                        console.log("🚨 [loadProjects] Используем экстренную копию");
+                        result = emergencyData;
+                    } else {
+                        console.log("🆕 [loadProjects] Нет данных, создаем пустой массив");
+                        result = [];
+                        try {
+                            localStorage.setItem(LS_PROJECTS_V3, JSON.stringify(result));
+                        } catch (e) {
+                            console.error("❌ [loadProjects] Не удалось создать пустой массив:", e);
+                        }
+                    }
+                }
+                
+                // 7. Нормализуем проекты
+                const dirs = loadDirections();
+                const normalized = result.map((p) => normalizeProject(p, dirs));
+                
+                console.log("✅ [loadProjects] Загружено проектов:", normalized.length);
+                
+                // 8. Дополнительная проверка: ищем дубликаты по ID
+                const ids = new Set();
+                const duplicates = [];
+                
+                normalized.forEach((project, index) => {
+                    if (ids.has(project.id)) {
+                        duplicates.push({ index, id: project.id, title: project.title });
+                    } else {
+                        ids.add(project.id);
+                    }
+                });
+                
+                if (duplicates.length > 0) {
+                    console.warn("⚠️ [loadProjects] Найдены дубликаты проектов:", duplicates);
+                    
+                    // Удаляем дубликаты, оставляя первый
+                    const uniqueProjects = [];
+                    const seenIds = new Set();
+                    
+                    normalized.forEach(project => {
+                        if (!seenIds.has(project.id)) {
+                            seenIds.add(project.id);
+                            uniqueProjects.push(project);
+                        }
+                    });
+                    
+                    console.log("🔄 [loadProjects] Удалено дубликатов:", normalized.length - uniqueProjects.length);
+                    
+                    // Сохраняем очищенные данные
+                    try {
+                        localStorage.setItem(LS_PROJECTS_V3, JSON.stringify(uniqueProjects));
+                        console.log("💾 [loadProjects] Данные очищены от дубликатов");
+                    } catch (e) {
+                        console.error("❌ [loadProjects] Не удалось очистить дубликаты:", e);
+                    }
+                    
+                    return uniqueProjects;
+                }
+                
+                return normalized;
+                
+            } catch (error) {
+                console.error("❌ [loadProjects] Критическая ошибка загрузки проектов:", error);
+                
+                // В случае полного краха возвращаем пустой массив
+                console.log("🆕 [loadProjects] Возвращаем пустой массив из-за ошибки");
+                return [];
+            }
         }
 
         /* ====================== Проекты от ФТИМ ====================== */
         function saveFTIMProjects(arr) {
+            console.log("💾 [saveFTIMProjects] Сохранение проектов ФТИМ, количество:", arr?.length || 0);
+            
+            // Проверяем валидность данных
+            if (!Array.isArray(arr)) {
+                console.error("❌ [saveFTIMProjects] Передан не массив:", arr);
+                return false;
+            }
+            
             try {
-                localStorage.setItem(LS_FTIM_PROJECTS, JSON.stringify(arr));
-            } catch {}
+                // 1. Создаем резервную копию текущих данных
+                const currentData = localStorage.getItem(LS_FTIM_PROJECTS);
+                const timestamp = Date.now();
+                
+                if (currentData) {
+                    localStorage.setItem(`${LS_FTIM_PROJECTS}_backup_${timestamp}`, currentData);
+                    console.log("📦 [saveFTIMProjects] Создана резервная копия проектов ФТИМ");
+                }
+                
+                // 2. Сохраняем новые данные
+                const dataToSave = JSON.stringify(arr);
+                localStorage.setItem(LS_FTIM_PROJECTS, dataToSave);
+                
+                console.log("✅ [saveFTIMProjects] Проекты ФТИМ успешно сохранены, размер:", dataToSave.length, "байт");
+                return true;
+                
+            } catch (error) {
+                console.error("❌ [saveFTIMProjects] Ошибка сохранения проектов ФТИМ:", error);
+                return false;
+            }
         }
 
         function loadFTIMProjects() {
+            console.log("📂 [loadFTIMProjects] Загрузка проектов ФТИМ...");
+            
+            let primaryData = null;
+            let backupData = null;
+            
             try {
+                // 1. Пробуем загрузить основные данные
                 const raw = localStorage.getItem(LS_FTIM_PROJECTS);
                 if (raw) {
-                    const arr = JSON.parse(raw);
-                    if (Array.isArray(arr)) return arr;
+                    primaryData = JSON.parse(raw);
+                    console.log("✅ [loadFTIMProjects] Основные данные загружены, записей:", primaryData?.length || 0);
                 }
-            } catch {}
-            localStorage.setItem(LS_FTIM_PROJECTS, JSON.stringify([]));
-            return [];
+                
+                // 2. Проверяем целостность данных
+                if (!primaryData || !Array.isArray(primaryData)) {
+                    console.warn("⚠️ [loadFTIMProjects] Основные данные повреждены или отсутствуют");
+                    
+                    // 3. Ищем самую свежую резервную копию
+                    const backupKeys = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key.startsWith(`${LS_FTIM_PROJECTS}_backup_`)) {
+                            backupKeys.push(key);
+                        }
+                    }
+                    
+                    if (backupKeys.length > 0) {
+                        // Берем самую свежую резервную копию
+                        backupKeys.sort((a, b) => {
+                            const timeA = parseInt(a.split('_').pop());
+                            const timeB = parseInt(b.split('_').pop());
+                            return timeB - timeA;
+                        });
+                        
+                        const latestBackupKey = backupKeys[0];
+                        const backupRaw = localStorage.getItem(latestBackupKey);
+                        if (backupRaw) {
+                            backupData = JSON.parse(backupRaw);
+                            console.log("🔄 [loadFTIMProjects] Загружены данные из резервной копии:", latestBackupKey);
+                        }
+                    }
+                }
+                
+                // 4. Выбираем источник данных в порядке приоритета
+                let result = primaryData;
+                
+                if (!result || !Array.isArray(result) || result.length === 0) {
+                    if (backupData && Array.isArray(backupData) && backupData.length > 0) {
+                        console.log("🔄 [loadFTIMProjects] Восстанавливаем из резервной копии");
+                        result = backupData;
+                        // Восстанавливаем основную копию
+                        try {
+                            localStorage.setItem(LS_FTIM_PROJECTS, JSON.stringify(result));
+                            console.log("💾 [loadFTIMProjects] Основные данные восстановлены из резервной копии");
+                        } catch (error) {
+                            console.error("❌ [loadFTIMProjects] Не удалось восстановить основные данные:", error);
+                        }
+                    } else {
+                        console.log("🆕 [loadFTIMProjects] Нет данных, создаем пустой массив");
+                        result = [];
+                        localStorage.setItem(LS_FTIM_PROJECTS, JSON.stringify(result));
+                    }
+                }
+                
+                console.log("✅ [loadFTIMProjects] Загружено проектов ФТИМ:", result.length);
+                return result;
+                
+            } catch (error) {
+                console.error("❌ [loadFTIMProjects] Критическая ошибка загрузки проектов ФТИМ:", error);
+                
+                // В случае полного краха возвращаем пустой массив
+                console.log("🆕 [loadFTIMProjects] Возвращаем пустой массив из-за ошибки");
+                return [];
+            }
+        }
+        
+        /* ====================== ДИАГНОСТИКА СОСТОЯНИЯ ДАННЫХ ====================== */
+        function diagnoseDataState() {
+            console.group("🔍 Диагностика состояния данных");
+            
+            // Проверяем localStorage
+            console.log("📊 Общий размер localStorage:", JSON.stringify(localStorage).length, "символов");
+            
+            // Проверяем ключи
+            const allKeys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                allKeys.push(localStorage.key(i));
+            }
+            console.log("🔑 Все ключи в localStorage:", allKeys);
+            
+            // Проверяем основные данные
+            const directions = loadDirections();
+            const projects = loadProjects();
+            const ftimProjects = loadFTIMProjects();
+            
+            console.log("📁 Направления:", directions.length);
+            console.log("📊 Проекты:", projects.length);
+            console.log("🏢 Проекты ФТИМ:", ftimProjects.length);
+            
+            // Проверяем резервные копии
+            const backupCounts = {
+                directions: 0,
+                projects: 0,
+                ftimProjects: 0
+            };
+            
+            allKeys.forEach(key => {
+                if (key.includes('_backup_')) {
+                    if (key.includes(LS_DIRECTIONS_V3)) backupCounts.directions++;
+                    if (key.includes(LS_PROJECTS_V3)) backupCounts.projects++;
+                    if (key.includes(LS_FTIM_PROJECTS)) backupCounts.ftimProjects++;
+                }
+            });
+            
+            console.log("📦 Резервные копии:", backupCounts);
+            
+            // Проверяем журнал изменений
+            try {
+                const changeLog = JSON.parse(localStorage.getItem("mvb_change_log") || "[]");
+                console.log("📝 Журнал изменений:", changeLog.length, "записей");
+                if (changeLog.length > 0) {
+                    console.log("Последние изменения:", changeLog.slice(0, 3));
+                }
+            } catch (e) {
+                console.log("Журнал изменений: недоступен");
+            }
+            
+            console.groupEnd();
+            
+            return {
+                directionsCount: directions.length,
+                projectsCount: projects.length,
+                ftimProjectsCount: ftimProjects.length,
+                backupCounts,
+                localStorageSize: JSON.stringify(localStorage).length
+            };
+        }
+        
+        // Автоматическая диагностика при загрузке (только в development)
+        setTimeout(() => {
+            if (window.location.href.includes('localhost') || window.location.href.includes('127.0.0.1')) {
+                console.log("🔍 Запуск автоматической диагностики...");
+                diagnoseDataState();
+            }
+        }, 3000);
+        
+        // Добавляем глобальную функцию для ручной диагностики
+        window.diagnoseAppData = diagnoseDataState;
+        
+        /* ====================== СИНХРОНИЗАЦИЯ И БЛОКИРОВКИ ====================== */
+        // Мьютекс для предотвращения одновременных операций записи
+        let writeMutex = {
+            isLocked: false,
+            queue: []
+        };
+        
+        async function withWriteLock(operationName, operation) {
+            console.log(`🔒 [${operationName}] Запрос блокировки записи...`);
+            
+            // Если уже заблокировано, ждем в очереди
+            if (writeMutex.isLocked) {
+                console.log(`⏳ [${operationName}] Ожидание разблокировки...`);
+                return new Promise((resolve, reject) => {
+                    writeMutex.queue.push({ operation, resolve, reject, name: operationName });
+                });
+            }
+            
+            // Блокируем
+            writeMutex.isLocked = true;
+            console.log(`🔒 [${operationName}] Блокировка получена`);
+            
+            try {
+                // Выполняем операцию
+                const result = await operation();
+                console.log(`✅ [${operationName}] Операция завершена успешно`);
+                return result;
+            } catch (error) {
+                console.error(`❌ [${operationName}] Ошибка операции:`, error);
+                throw error;
+            } finally {
+                // Разблокируем и выполняем следующую операцию из очереди
+                writeMutex.isLocked = false;
+                console.log(`🔓 [${operationName}] Блокировка снята`);
+                
+                if (writeMutex.queue.length > 0) {
+                    const next = writeMutex.queue.shift();
+                    console.log(`➡️ [${next.name}] Запуск следующей операции из очереди`);
+                    setTimeout(() => {
+                        withWriteLock(next.name, next.operation)
+                            .then(next.resolve)
+                            .catch(next.reject);
+                    }, 10);
+                }
+            }
+        }
+        
+        // Функция для безопасного сохранения проектов с блокировкой
+        async function saveProjectsSafe(arr, context = 'unknown') {
+            return withWriteLock(`saveProjects:${context}`, () => {
+                return new Promise((resolve, reject) => {
+                    try {
+                        const result = saveProjects(arr);
+                        if (result) {
+                            resolve(arr);
+                        } else {
+                            reject(new Error(`Ошибка сохранения проектов в контексте: ${context}`));
+                        }
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            });
+        }
+        
+        // Функция для безопасного сохранения направлений с блокировкой
+        async function saveDirectionsSafe(arr, context = 'unknown') {
+            return withWriteLock(`saveDirections:${context}`, () => {
+                return new Promise((resolve, reject) => {
+                    try {
+                        const result = saveDirections(arr);
+                        if (result) {
+                            resolve(arr);
+                        } else {
+                            reject(new Error(`Ошибка сохранения направлений в контексте: ${context}`));
+                        }
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            });
         }
 
         /* ====================== Примитивы UI ====================== */
@@ -4009,12 +4660,126 @@
             const [lastUpdate, setLastUpdate] = useState(new Date());
         
             // Обновляем состояние при изменении cloudData
+            // Улучшенная функция для слияния данных с разрешением конфликтов
+            function mergeDataSimple(local, cloud, key) {
+                console.log("🔄 Объединение данных. Локальных:", local?.length || 0, "Облачных:", cloud?.length || 0);
+                
+                // Гарантируем, что это массивы
+                const localArray = Array.isArray(local) ? local : [];
+                const cloudArray = Array.isArray(cloud) ? cloud : [];
+                
+                // Если облачных данных нет, возвращаем локальные
+                if (cloudArray.length === 0) {
+                    console.log("📌 Облачных данных нет, оставляем локальные");
+                    return localArray;
+                }
+                
+                // Если локальных данных нет, возвращаем облачные
+                if (localArray.length === 0) {
+                    console.log("📌 Локальных данных нет, берем облачные");
+                    return cloudArray;
+                }
+                
+                // Создаем карту для объединения
+                const resultMap = new Map();
+                
+                // 1. Сначала добавляем все локальные проекты
+                localArray.forEach(item => {
+                    if (item && item[key]) {
+                        resultMap.set(item[key], item);
+                    }
+                });
+                
+                // 2. Добавляем облачные проекты, но НЕ перезаписываем локальные
+                cloudArray.forEach(cloudItem => {
+                    if (cloudItem && cloudItem[key]) {
+                        const itemKey = cloudItem[key];
+                        const existingItem = resultMap.get(itemKey);
+                        
+                        if (!existingItem) {
+                            // Если такого проекта нет локально, добавляем из облака
+                            resultMap.set(itemKey, cloudItem);
+                            console.log("➕ Добавлен проект из облака:", cloudItem.title || cloudItem.name);
+                        } else {
+                            // Если проект уже есть локально, НЕ перезаписываем его
+                            console.log("⏭️ Пропускаем облачный проект (уже есть локально):", 
+                                cloudItem.title || cloudItem.name);
+                        }
+                    }
+                });
+                
+                const result = Array.from(resultMap.values());
+                console.log("✅ После объединения осталось проектов:", result.length);
+                return result;
+            }
+            
             useEffect(() => {
                 if (cloudData) {
-                    setDirections(Array.isArray(cloudData.directions) ? cloudData.directions : []);
-                    setProjects(Array.isArray(cloudData.projects) ? cloudData.projects : []);
-                    setFtimProjects(Array.isArray(cloudData.ftimProjects) ? cloudData.ftimProjects : []);
+                    console.log("☁️ Получены данные из облака:", {
+                        directions: cloudData.directions?.length || 0,
+                        projects: cloudData.projects?.length || 0,
+                        ftimProjects: cloudData.ftimProjects?.length || 0
+                    });
+                    
+                    // Нормализуем направления из облака
+                    const cloudDirections = Array.isArray(cloudData.directions) ? cloudData.directions : [];
+                    const normalizedCloudDirs = cloudDirections.map(d => ({
+                        ...d,
+                        archived: d.archived || false
+                    }));
+                    
+                    // Нормализуем проекты из облака
+                    const cloudProjects = Array.isArray(cloudData.projects) ? cloudData.projects : [];
+                    const normalizedCloudProjects = cloudProjects.map(p => {
+                        const norm = normalizeProject(p, normalizedCloudDirs);
+                        // Добавляем метку, что это из облака
+                        return { ...norm, source: 'cloud' };
+                    });
+                    
+                    // Нормализуем проекты ФТИМ из облака
+                    const cloudFTIM = Array.isArray(cloudData.ftimProjects) ? cloudData.ftimProjects : [];
+                    const normalizedCloudFTIM = cloudFTIM.map(p => ({
+                        ...p,
+                        source: 'cloud'
+                    }));
+                    
+                    // Объединяем с локальными данными
+                    setDirections(prev => {
+                        const merged = mergeDataSimple(prev, normalizedCloudDirs, 'code');
+                        console.log("📁 Направления после объединения:", merged.length);
+                        return merged;
+                    });
+                    
+                    setProjects(prev => {
+                        const merged = mergeDataSimple(prev, normalizedCloudProjects, 'id');
+                        console.log("📊 Проекты после объединения:", merged.length);
+                        
+                        // Сохраняем локально
+                        try {
+                            localStorage.setItem(LS_PROJECTS_V3, JSON.stringify(merged));
+                            console.log("💾 Проекты сохранены локально");
+                        } catch (error) {
+                            console.error("❌ Ошибка сохранения проектов:", error);
+                        }
+                        
+                        return merged;
+                    });
+                    
+                    setFtimProjects(prev => {
+                        const merged = mergeDataSimple(prev, normalizedCloudFTIM, 'id');
+                        console.log("🏢 Проекты ФТИМ после объединения:", merged.length);
+                        
+                        try {
+                            localStorage.setItem(LS_FTIM_PROJECTS, JSON.stringify(merged));
+                        } catch (error) {
+                            console.error("❌ Ошибка сохранения проектов ФТИМ:", error);
+                        }
+                        
+                        return merged;
+                    });
+                    
                     setLastUpdate(new Date());
+                    console.log("✅ Облачные данные успешно обработаны");
                 }
             }, [cloudData]);
                         
@@ -4264,15 +5029,109 @@
             };
 
             const addOrUpdateProject = (project) => {
+                console.log("💾 [ШАГ 2] Начало сохранения проекта:", {
+                    id: project.id,
+                    title: project.title,
+                    direction: project.directionName
+                });
+                
+                // Добавляем метку времени и источник
+                const projectWithMetadata = {
+                    ...project,
+                    lastUpdated: new Date().toISOString(), // Добавляем временную метку
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: currentUser?.name || "unknown",
+                    source: 'local'
+                };
+                
+                // Дополнительная проверка проекта
+                if (!projectWithMetadata.id || !projectWithMetadata.title) {
+                    console.error("❌ [ШАГ 2] Попытка сохранить невалидный проект:", projectWithMetadata);
+                    alert("Ошибка: проект должен иметь ID и название");
+                    return;
+                }
+                
                 setProjects((prev) => {
-                    // ✅ ГАРАНТИРУЕМ, что prev - массив
-                    const prevArray = Array.isArray(prev) ? prev : [];
-                    const exists = prevArray.some((p) => p.id === project.id);
-                    const next = exists ? prevArray.map((p) => (p.id === project.id ? project : p)) : [project, ...prevArray];
-                    saveProjects(next);
+                    // 1. ГАРАНТИРУЕМ, что prev - валидный массив
+                    let prevArray;
+                    try {
+                        if (Array.isArray(prev)) {
+                            prevArray = prev;
+                            console.log(`📊 [ШАГ 2] Получено ${prevArray.length} проектов из состояния`);
+                        } else {
+                            console.warn("⚠️ [ШАГ 2] Состояние projects не является массивом:", typeof prev);
+                            // Пытаемся загрузить из localStorage
+                            const loaded = loadProjects();
+                            prevArray = Array.isArray(loaded) ? loaded : [];
+                            console.log(`📂 [ШАГ 2] Загружено ${prevArray.length} проектов из localStorage`);
+                        }
+                    } catch (error) {
+                        console.error("❌ [ШАГ 2] Критическая ошибка при обработке prev:", error);
+                        prevArray = [];
+                    }
+                    
+                    // 2. Проверяем дубликаты
+                    const existsIndex = prevArray.findIndex((p) => p.id === projectWithMetadata.id);
+                    const exists = existsIndex !== -1;
+                    
+                    // 3. Создаем новый массив
+                    let next;
+                    if (exists) {
+                        console.log(`🔄 [ШАГ 2] Обновление существующего проекта (индекс ${existsIndex})`);
+                        next = [...prevArray];
+                        next[existsIndex] = projectWithMetadata;
+                    } else {
+                        console.log("🆕 [ШАГ 2] Добавление нового проекта");
+                        next = [projectWithMetadata, ...prevArray];
+                    }
+                    
+                    // 4. Логируем изменения
+                    console.log(`📈 [ШАГ 2] Проектов: было ${prevArray.length}, стало ${next.length}`);
+                    
+                    // 5. Сохраняем с резервным копированием
+                    try {
+                        saveProjects(next);
+                        console.log("✅ [ШАГ 2] Проекты успешно сохранены");
+                    } catch (error) {
+                        console.error("❌ [ШАГ 2] Ошибка сохранения проектов:", error);
+                        alert("Внимание! Возникла проблема при сохранении проекта. Данные могут быть не сохранены.");
+                        
+                        // Пробуем экстренное сохранение
+                        try {
+                            localStorage.setItem(LS_PROJECTS_V3 + "_emergency_" + Date.now(), JSON.stringify(projectWithMetadata));
+                            console.log("🚨 [ШАГ 2] Создана экстренная резервная копия проекта");
+                        } catch (e) {
+                            console.error("❌ [ШАГ 2] Не удалось создать экстренную копию:", e);
+                        }
+                        
+                        // Возвращаем старое состояние при ошибке
+                        return prevArray;
+                    }
+                    
+                    // 6. Сохраняем историю изменений (для отладки)
+                    try {
+                        const changeLog = {
+                            timestamp: new Date().toISOString(),
+                            action: exists ? "update" : "create",
+                            projectId: projectWithMetadata.id,
+                            projectTitle: projectWithMetadata.title,
+                            user: currentUser?.name || "unknown",
+                            countBefore: prevArray.length,
+                            countAfter: next.length
+                        };
+                        
+                        const existingLog = JSON.parse(localStorage.getItem("mvb_change_log") || "[]");
+                        existingLog.unshift(changeLog);
+                        localStorage.setItem("mvb_change_log", JSON.stringify(existingLog.slice(0, 50))); // Храним последние 50 изменений
+                    } catch (e) {
+                        console.warn("⚠️ [ШАГ 2] Не удалось сохранить лог изменений:", e);
+                    }
+                    
                     return next;
                 });
+                
                 setDataset("projects");
+                console.log("🎯 [ШАГ 2] Переключение на вкладку проектов");
             };
 
             const addOrUpdateFTIMProject = (project) => {
@@ -6460,6 +7319,254 @@ Fit ${it.fitScore ?? 0}% • Pilot ${it.pilotReadiness ?? 0}% • Idea ${idea}%`
             )
           );
         }
+         /* ====================== ПРОВЕРКА КВОТЫ И ВОССТАНОВЛЕНИЕ ====================== */
+        // Проверка квоты localStorage при загрузке
+        function checkStorageQuota() {
+            try {
+                const testKey = 'quota_test';
+                const testData = 'x'.repeat(1024 * 1024); // 1MB
+                localStorage.setItem(testKey, testData);
+                localStorage.removeItem(testKey);
+                console.log("✅ Достаточно места в localStorage");
+                return true;
+            } catch (error) {
+                console.error("❌ Недостаточно места в localStorage:", error);
+                
+                // Предлагаем очистить данные
+                if (confirm("Закончилось место в локальном хранилище. Очистить старые резервные копии?")) {
+                    clearOldBackups();
+                }
+                return false;
+            }
+        }
+        // Функция очистки старых резервных копий
+        function clearOldBackups() {
+            const prefixes = [LS_DIRECTIONS_V3, LS_PROJECTS_V3, LS_FTIM_PROJECTS];
+            let cleared = 0;
+            
+            prefixes.forEach(prefix => {
+                const backupKeys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith(`${prefix}_backup_`)) {
+                        backupKeys.push(key);
+                    }
+                }
+                
+                // Оставляем только 1 самую свежую резервную копию для каждого типа
+                if (backupKeys.length > 1) {
+                    backupKeys.sort();
+                    const toRemove = backupKeys.slice(0, backupKeys.length - 1);
+                    toRemove.forEach(key => {
+                        localStorage.removeItem(key);
+                        cleared++;
+                    });
+                }
+            });
+            
+            console.log(`🧹 Очищено ${cleared} старых резервных копий`);
+            return cleared;
+        }
+
+        // Проверяем квоту при загрузке
+        setTimeout(checkStorageQuota, 1000);
+
+        // Функция для восстановления данных из резервных копий (для администратора)
+        function restoreFromBackup() {
+            if (!currentUser || currentUser.role !== USER_ROLES.FOUNDATION) {
+                alert("Только сотрудник ФТИМ может восстанавливать данные из резервных копий");
+                return;
+            }
+            
+            const backups = {
+                directions: [],
+                projects: [],
+                ftimProjects: []
+            };
+            
+            // Собираем все резервные копии
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.includes('_backup_')) {
+                    if (key.includes(LS_DIRECTIONS_V3)) {
+                        backups.directions.push({ key, timestamp: parseInt(key.split('_').pop()) });
+                    } else if (key.includes(LS_PROJECTS_V3)) {
+                        backups.projects.push({ key, timestamp: parseInt(key.split('_').pop()) });
+                    } else if (key.includes(LS_FTIM_PROJECTS)) {
+                        backups.ftimProjects.push({ key, timestamp: parseInt(key.split('_').pop()) });
+                    }
+                }
+            }
+            
+            // Сортируем по времени (новые первыми)
+            backups.directions.sort((a, b) => b.timestamp - a.timestamp);
+            backups.projects.sort((a, b) => b.timestamp - a.timestamp);
+            backups.ftimProjects.sort((a, b) => b.timestamp - a.timestamp);
+            
+            // Показываем диалог выбора
+            const message = `Найдены резервные копии:\n\n` +
+                          `Направлений: ${backups.directions.length}\n` +
+                          `Проектов: ${backups.projects.length}\n` +
+                          `Проектов ФТИМ: ${backups.ftimProjects.length}\n\n` +
+                          `Восстановить последние резервные копии?`;
+            
+            if (confirm(message)) {
+                try {
+                    // Восстанавливаем направления
+                    if (backups.directions.length > 0) {
+                        const latest = backups.directions[0];
+                        const data = localStorage.getItem(latest.key);
+                        if (data) {
+                            localStorage.setItem(LS_DIRECTIONS_V3, data);
+                            console.log(`✅ Восстановлены направления из ${new Date(latest.timestamp).toLocaleString()}`);
+                        }
+                    }
+                    
+                    // Восстанавливаем проекты
+                    if (backups.projects.length > 0) {
+                        const latest = backups.projects[0];
+                        const data = localStorage.getItem(latest.key);
+                        if (data) {
+                            localStorage.setItem(LS_PROJECTS_V3, data);
+                            console.log(`✅ Восстановлены проекты из ${new Date(latest.timestamp).toLocaleString()}`);
+                        }
+                    }
+                    
+                    // Восстанавливаем проекты ФТИМ
+                    if (backups.ftimProjects.length > 0) {
+                        const latest = backups.ftimProjects[0];
+                        const data = localStorage.getItem(latest.key);
+                        if (data) {
+                            localStorage.setItem(LS_FTIM_PROJECTS, data);
+                            console.log(`✅ Восстановлены проекты ФТИМ из ${new Date(latest.timestamp).toLocaleString()}`);
+                        }
+                    }
+                    
+                    alert("✅ Восстановление завершено! Перезагрузите страницу для применения изменений.");
+                    window.location.reload();
+                    
+                } catch (error) {
+                    console.error("❌ Ошибка восстановления:", error);
+                    alert("Ошибка при восстановлении данных");
+                }
+            }
+        }
+                /* ====================== ДИАГНОСТИКА В РЕАЛЬНОМ ВРЕМЕНИ ====================== */
+        // Простая функция для проверки состояния данных
+        function checkDataStatus() {
+            console.group("📊 Проверка состояния данных");
+            
+            try {
+                const projects = JSON.parse(localStorage.getItem(LS_PROJECTS_V3) || "[]");
+                const directions = JSON.parse(localStorage.getItem(LS_DIRECTIONS_V3) || "[]");
+                const ftimProjects = JSON.parse(localStorage.getItem(LS_FTIM_PROJECTS) || "[]");
+                
+                console.log("📁 Направления:", directions.length);
+                console.log("📊 Проекты:", projects.length);
+                console.log("🏢 Проекты ФТИМ:", ftimProjects.length);
+                
+                // Проверяем временные метки
+                const projectsWithTimestamps = projects.filter(p => p.lastUpdated);
+                console.log("🕒 Проектов с временными метками:", projectsWithTimestamps.length);
+                
+                // Проверяем состояние каждого проекта
+                if (projects.length > 0) {
+                    console.log("📋 Статистика проектов:");
+                    projects.forEach((p, i) => {
+                        console.log(`  ${i+1}. "${p.title || 'Без названия'}" - ID: ${p.id}, lastUpdated: ${p.lastUpdated ? '✓' : '✗'}, статус: ${p.status}`);
+                    });
+                }
+                
+                // Предупреждение, если нет временных меток
+                if (projects.length > 0 && projectsWithTimestamps.length === 0) {
+                    console.warn("⚠️ ВНИМАНИЕ: У проектов нет временных меток! Это может привести к проблемам при синхронизации.");
+                }
+                
+                // Проверяем размер localStorage
+                const totalSize = JSON.stringify(localStorage).length;
+                console.log("💾 Размер localStorage:", totalSize, "символов (примерно", Math.round(totalSize / 1024), "KB)");
+                
+            } catch (error) {
+                console.error("❌ Ошибка проверки данных:", error);
+            }
+            
+            console.groupEnd();
+            return true;
+        }
+
+        // Автоматическая проверка каждые 30 секунд (только если в консоли открыто)
+        let checkInterval = null;
+        
+        function startDataMonitoring() {
+            if (!checkInterval) {
+                console.log("🔍 Запуск мониторинга данных...");
+                checkInterval = setInterval(() => {
+                    // Проверяем только если консоль открыта (performance.now доступен)
+                    if (typeof console !== 'undefined' && console.group) {
+                        checkDataStatus();
+                    }
+                }, 30000); // 30 секунд
+            }
+        }
+
+        // Функция для ручной проверки
+        window.checkDataStatus = checkDataStatus;
+        
+        // Функция для проверки конкретного проекта по ID
+        window.checkProject = (projectId) => {
+            try {
+                const projects = JSON.parse(localStorage.getItem(LS_PROJECTS_V3) || "[]");
+                const project = projects.find(p => p.id === projectId);
+                if (project) {
+                    console.group("🔍 Проверка проекта:", project.title);
+                    console.log("ID:", project.id);
+                    console.log("Название:", project.title);
+                    console.log("Направление:", project.directionName);
+                    console.log("Статус:", project.status);
+                    console.log("lastUpdated:", project.lastUpdated);
+                    console.log("Заказчик:", project.customer);
+                    console.log("FitScore:", project.fitScore);
+                    console.log("Исходный объект:", project);
+                    console.groupEnd();
+                    return project;
+                } else {
+                    console.log("❌ Проект с ID", projectId, "не найден");
+                    return null;
+                }
+            } catch (error) {
+                console.error("Ошибка при проверке проекта:", error);
+                return null;
+            }
+        };
+
+        // Запускаем мониторинг через 5 секунд после загрузки
+        setTimeout(startDataMonitoring, 5000);
+
+        // Сообщение в консоль при загрузке
+        console.log("🚀 Приложение 'Карта направлений' загружено!");
+        console.log("📝 Для диагностики используйте команды:");
+        console.log("  • checkDataStatus() - проверить состояние данных");
+        console.log("  • checkProject('id_проекта') - проверить конкретный проект");
+        console.log("  • diagnoseAppData() - полная диагностика (если добавляли ранее)");
+
+        // Добавляем кнопку восстановления в интерфейс (только для сотрудников ФТИМ)
+        if (currentUser?.role === USER_ROLES.FOUNDATION) {
+            // Эта функция будет вызвана после загрузки приложения
+            setTimeout(() => {
+                const toolbar = document.querySelector('.actions');
+                if (toolbar) {
+                    const restoreBtn = document.createElement('button');
+                    restoreBtn.className = 'btn';
+                    restoreBtn.style.background = 'var(--yellow)';
+                    restoreBtn.style.color = 'black';
+                    restoreBtn.innerHTML = '🔄 Восстановить из резервной копии';
+                    restoreBtn.onclick = restoreFromBackup;
+                    restoreBtn.title = 'Восстановить данные из последней резервной копии';
+                    toolbar.appendChild(restoreBtn);
+                }
+            }, 2000);
+        }
+        
     </script>
 </body>
 </html>
